@@ -429,6 +429,7 @@
 
   footer{ margin-top:26px; font-size:11.5px; color:var(--ink-faint); text-align:center; }
 </style>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 <div id="app">
@@ -448,7 +449,8 @@
         <button class="persist-btn" id="saveLocalBtn" style="display:none;">Save Data</button>
         <button class="persist-btn" id="goCloudBtn" style="display:none;">Set up cloud sync</button>
         <button class="persist-btn" id="advancedBtn">Advanced</button>
-        <button class="persist-btn" id="fixTodayBtn" style="background:var(--urgent-bg); color:var(--urgent); border-color:var(--urgent);">Fix Today's Data</button>
+        <button class="persist-btn" id="connectCalendarBtn" style="background:var(--accent-pine-soft); color:var(--accent-pine); border-color:var(--accent-pine);">📅 Refresh from Calendar</button>
+        <span class="save-status" id="calendarStatus"></span>
       </div>
       <div class="today-pill" id="todayPill"></div>
     </div>
@@ -569,6 +571,10 @@
             <select id="laClientSelect"></select>
             <button class="btn" id="addLaBtn">Add to bucket</button>
           </div>
+
+          <p class="inv-subhead" style="margin-top:20px;">Live Upcoming (next 90 days, from Calendar)</p>
+          <p class="panel-note" style="margin:-4px 0 10px;">Non-recurring calendar events only — routine stuff (drop-off, weekly coaching) is filtered out to avoid clutter. Click "Refresh from Calendar" above to populate this.</p>
+          <div id="liveUpcomingList"></div>
         </section>
 
       </div>
@@ -964,9 +970,172 @@ let STATE = {
     { id:2, label:"Flag Football Combine / Skills Night — Wed Sept 2, 5-7:45pm, Littleton Russell Street track", category:"Flag Football", days:5, done:true },
     { id:4, label:"MS Back to School Night — Mon Sept 14 (Littleton district calendar)", category:"School", days:17, done:false },
   ],
+
+  // Populated live from Google Calendar via the "Refresh from Calendar" button — not
+  // hand-edited. Non-recurring events in the next 90 days, no client tagging attempted
+  // (that requires judgment a raw API pull can't do).
+  liveUpcoming: [],
 };
 
 function clientById(id){ return STATE.clients.find(c => c.id === id); }
+
+/* =========================================================
+   LIVE GOOGLE CALENDAR — separate OAuth from Firebase login. Read-only, browser-only,
+   no server involved. Click "Refresh from Calendar" to pull fresh data on demand
+   (not a silent background sync — Google's client-side flow doesn't support that).
+   ========================================================= */
+
+const GOOGLE_OAUTH_CLIENT_ID = "234951550080-9toau61c77cuj1huj97ufqemfmofi5qb.apps.googleusercontent.com";
+let googleAccessToken = null;
+let googleTokenClient = null;
+
+function initGoogleAuth(){
+  if(typeof google === "undefined" || !google.accounts) {
+    // Google Identity Services script hasn't loaded yet — retry shortly.
+    setTimeout(initGoogleAuth, 500);
+    return;
+  }
+  googleTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOGLE_OAUTH_CLIENT_ID,
+    scope: "https://www.googleapis.com/auth/calendar.readonly",
+    callback: (resp) => {
+      if(resp.error){
+        setCalendarStatus("Calendar connection failed");
+        console.error(resp);
+        return;
+      }
+      googleAccessToken = resp.access_token;
+      refreshLiveCalendar();
+    }
+  });
+}
+
+function setCalendarStatus(text){
+  const el = document.getElementById("calendarStatus");
+  if(el) el.textContent = text;
+}
+
+document.getElementById("connectCalendarBtn").addEventListener("click", ()=>{
+  if(!googleTokenClient){
+    setCalendarStatus("Still loading Google's sign-in library — try again in a sec");
+    return;
+  }
+  setCalendarStatus("Connecting…");
+  googleTokenClient.requestAccessToken({ prompt: googleAccessToken ? "" : "consent" });
+});
+
+async function refreshLiveCalendar(){
+  if(!googleAccessToken) return;
+  setCalendarStatus("Refreshing…");
+  try{
+    await refreshTodayFromCalendar();
+    await refreshLookAheadFromCalendar();
+    const stamp = new Date().toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
+    setCalendarStatus("✓ Live as of " + stamp);
+    markDirty();
+  }catch(err){
+    console.error(err);
+    setCalendarStatus("Calendar refresh failed — click to retry");
+  }
+}
+
+async function fetchCalendarEvents(start, end){
+  const params = new URLSearchParams({
+    timeMin: start.toISOString(),
+    timeMax: end.toISOString(),
+    singleEvents: "true",
+    orderBy: "startTime",
+    maxResults: "150"
+  });
+  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`, {
+    headers: { Authorization: `Bearer ${googleAccessToken}` }
+  });
+  if(res.status === 401){
+    // Token expired — clear it so the next click re-prompts for consent instead of failing silently.
+    googleAccessToken = null;
+    throw new Error("Calendar session expired — click Refresh again to reconnect");
+  }
+  if(!res.ok) throw new Error("Calendar API error " + res.status);
+  const data = await res.json();
+  return data.items || [];
+}
+
+function formatTimeShort(date){
+  let h = date.getHours();
+  const m = date.getMinutes();
+  const ampm = h >= 12 ? "pm" : "am";
+  h = h % 12; if(h === 0) h = 12;
+  const mm = m === 0 ? "00" : String(m).padStart(2,"0");
+  return `${h}:${mm}${ampm}`;
+}
+
+async function refreshTodayFromCalendar(){
+  const now = new Date();
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+  const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+  const events = await fetchCalendarEvents(dayStart, dayEnd);
+
+  const timed = events
+    .filter(e => e.start && e.start.dateTime)
+    .map(e => ({
+      start: new Date(e.start.dateTime),
+      end: new Date(e.end.dateTime),
+      title: e.summary || "(untitled)",
+      location: e.location || ""
+    }))
+    .sort((a,b) => a.start - b.start);
+
+  const blocks = [];
+  let id = 1;
+  let cursor = new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), 7, 0);
+  const workEnd = new Date(dayStart.getFullYear(), dayStart.getMonth(), dayStart.getDate(), 19, 0);
+
+  for(const ev of timed){
+    if(ev.start > cursor && (ev.start - cursor) >= 15*60*1000){
+      blocks.push({ id:id++, time:`${formatTimeShort(cursor)}–${formatTimeShort(ev.start)}`, open:true, title:"Open",
+        suggestion:"Nothing flagged in the Follow-Up Queue right now." });
+    }
+    blocks.push({ id:id++, time:`${formatTimeShort(ev.start)}–${formatTimeShort(ev.end)}`, title:ev.title, client:null,
+      meta: ev.location || "Pulled live from Calendar — add a client tag via the Advanced editor if needed" });
+    if(ev.end > cursor) cursor = ev.end;
+  }
+  if(workEnd > cursor){
+    blocks.push({ id:id++, time:`${formatTimeShort(cursor)}–${formatTimeShort(workEnd)}`, open:true, title:"Open",
+      suggestion:"Nothing flagged in the Follow-Up Queue right now." });
+  }
+
+  STATE.todayBlocks = blocks;
+  STATE.todayLabel = now.toLocaleDateString("en-US", {weekday:"short", month:"short", day:"numeric"}) + " · live from Calendar";
+  renderToday();
+}
+
+async function refreshLookAheadFromCalendar(){
+  const now = new Date();
+  const end90 = new Date(now.getTime() + 90*24*60*60*1000);
+  const events = await fetchCalendarEvents(now, end90);
+
+  const nonRecurring = events.filter(e => !e.recurringEventId && (e.start.dateTime || e.start.date));
+  STATE.liveUpcoming = nonRecurring.slice(0, 40).map(e => ({
+    title: e.summary || "(untitled)",
+    dateLabel: new Date(e.start.dateTime || e.start.date).toLocaleDateString("en-US", {weekday:"short", month:"short", day:"numeric"}),
+    location: e.location || ""
+  }));
+  renderLiveUpcoming();
+}
+
+function renderLiveUpcoming(){
+  const el = document.getElementById("liveUpcomingList");
+  if(!el) return;
+  if(!STATE.liveUpcoming || STATE.liveUpcoming.length === 0){
+    el.innerHTML = `<div class="empty-state">Nothing pulled yet — click "Refresh from Calendar" above.</div>`;
+    return;
+  }
+  el.innerHTML = STATE.liveUpcoming.map(u => `
+    <div class="la-item">
+      <div class="top"><span class="title">${u.title}</span></div>
+      <div class="note">${u.dateLabel}${u.location ? " · " + u.location : ""}</div>
+    </div>`).join("");
+}
 
 /* =========================================================
    PERSISTENCE — Firebase (Auth + Firestore), auto-save with manual version snapshots
@@ -1131,6 +1300,7 @@ function loadIntoState(obj){
   STATE.upcomingInvoices = obj.upcomingInvoices || [];
   STATE.contacts = obj.contacts || [];
   STATE.familyItems = obj.familyItems || STATE.familyItems;
+  STATE.liveUpcoming = obj.liveUpcoming || [];
   renderAll();
   suppressDirty = false;
 }
@@ -1235,33 +1405,6 @@ function closeAdvancedModal(){
   document.getElementById("advancedModal").classList.remove("open");
 }
 document.getElementById("advancedBtn").addEventListener("click", openAdvancedModal);
-
-// One-click fix for the Sept 3 → Sept 2 data mix-up, no manual JSON pasting required.
-document.getElementById("fixTodayBtn").addEventListener("click", ()=>{
-  if(!confirm("Replace Today's Timeline and date label with the corrected Sept 2 schedule?")) return;
-  STATE.todayLabel = "Wed, Sept 2 · packed day, drop-off through Flag Football Combine tonight";
-  STATE.todayBlocks = [
-    { id:1, time:"7:30–8:05am", title:"School drop off", client:null,
-      meta:"Recurring weekday commitment" },
-    { id:2, time:"8:05–10:00am", open:true, title:"Open",
-      suggestion:"Nothing flagged in the Follow-Up Queue right now." },
-    { id:3, time:"10:00–11:00am", title:"Lisa S <> Jillian", client:"lisa-s", isCoaching:true,
-      meta:"Zoom · biweekly coaching" },
-    { id:4, time:"11:00am–12:00pm", title:"Coaching Session", client:"sgh-admin", isCoaching:true,
-      meta:"Zoom · with Melissa Purpura, Shino Takagi also invited" },
-    { id:5, time:"12:00–1:00pm", title:"Donna <> Jillian", client:"sgh-hr",
-      meta:"Zoom · SGH — HR & Corp Project" },
-    { id:6, time:"1:00–4:45pm", title:"Jamie & kiddos to swim?", client:null,
-      meta:"Loosely blocked personal plan — overlaps with soccer tryouts below, worth a quick check that both still work" },
-    { id:7, time:"2:45–4:00pm", title:"Soccer tryouts", client:null,
-      meta:"Turf tryouts 2:45-3:45, conditioning at LMS 3:45-4:00 — overlaps the swim block above" },
-    { id:8, time:"5:00–7:45pm", title:"Flag Football Combine", client:null,
-      meta:"Littleton Russell Street track — Skills Night, not a tryout" },
-  ];
-  markDirty();
-  renderAll();
-  alert("Fixed — Today's Timeline and date label are corrected.");
-});
 document.getElementById("closeAdvancedBtn").addEventListener("click", closeAdvancedModal);
 document.getElementById("cancelAdvancedBtn").addEventListener("click", closeAdvancedModal);
 document.getElementById("advancedModal").addEventListener("click", (e)=>{
@@ -1837,6 +1980,7 @@ function renderAll(){
   renderContacts();
   renderClientRoster();
   renderFamilyItems();
+  renderLiveUpcoming();
 }
 
 /* =========================================================
@@ -2272,6 +2416,7 @@ document.getElementById("addFamilyBtn").addEventListener("click", ()=>{
 document.getElementById("todayPill").textContent = "Wednesday, September 2, 2026";
 document.getElementById("contactCategorySelect").innerHTML = categoryOptionsHtml("");
 renderAll(); // renders the seeded starter data immediately; loadFromFirestore() overwrites it after sign-in
+initGoogleAuth(); // sets up the Calendar OAuth token client, separate from Firebase login
 </script>
 
 <!-- =========================================================
