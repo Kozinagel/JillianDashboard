@@ -118,6 +118,11 @@
     padding:10px 0; border-bottom:1px solid var(--line-soft);
   }
   .history-row:last-child{ border-bottom:none; }
+  .advanced-textarea{
+    width:100%; min-height:320px; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size:12.5px; line-height:1.5; padding:12px; border-radius:8px; border:1px solid var(--line);
+    background:var(--paper); color:var(--ink); resize:vertical; box-sizing:border-box;
+  }
   .history-when{ font-size:13px; font-weight:600; }
   .history-label{ font-size:11.5px; color:var(--ink-faint); }
 
@@ -442,12 +447,46 @@
         <button class="persist-btn" id="loadLocalBtn" style="display:none;">Load Data</button>
         <button class="persist-btn" id="saveLocalBtn" style="display:none;">Save Data</button>
         <button class="persist-btn" id="goCloudBtn" style="display:none;">Set up cloud sync</button>
+        <button class="persist-btn" id="advancedBtn">Advanced</button>
       </div>
       <div class="today-pill" id="todayPill"></div>
     </div>
   </header>
   <p class="persist-note" id="persistNote">Every change syncs automatically to your private Firebase database — no file to open or save. Click <b>Save Version</b> any time you want a labeled checkpoint you can restore later; click <b>History</b> to browse and restore past versions.</p>
   <input type="file" id="fileFallbackInput" accept="application/json" style="display:none">
+
+  <!-- Advanced: bulk JSON view/edit for any section, applies in one click -->
+  <div id="advancedModal" class="modal-overlay">
+    <div class="modal-card" style="max-width:720px;">
+      <div class="modal-head">
+        <h3 class="display">Advanced — Bulk Edit</h3>
+        <button class="modal-close" id="closeAdvancedBtn" title="Close">✕</button>
+      </div>
+      <p class="panel-note" style="margin-bottom:10px;">Pick a section, edit the JSON directly, click Apply. One save instead of many clicks — use this whenever a bulk correction (like a wrong date across several entries) makes individual edits impractical.</p>
+      <div class="add-row" style="margin-bottom:10px;">
+        <select id="advancedSectionSelect">
+          <option value="todayBlocks">Today's Timeline</option>
+          <option value="followups">Client Follow-Up Queue</option>
+          <option value="actions">Actions Due</option>
+          <option value="lookAhead">Look Ahead (30/60/90)</option>
+          <option value="clients">Client Roster</option>
+          <option value="billingTerms">Billing Terms</option>
+          <option value="invoices">Invoice Tracker</option>
+          <option value="upcomingInvoices">Upcoming Invoices</option>
+          <option value="hoursLog">Hours Log</option>
+          <option value="contacts">Non-Client Contacts</option>
+          <option value="familyItems">Family &amp; School Watch</option>
+        </select>
+        <button class="btn btn-ghost" id="loadAdvancedBtn">Load current</button>
+      </div>
+      <textarea id="advancedTextarea" class="advanced-textarea" spellcheck="false" placeholder="Click 'Load current' to see this section's data, edit it, then Apply."></textarea>
+      <div class="auth-error" id="advancedError"></div>
+      <div class="add-row" style="margin-top:10px;">
+        <button class="btn" id="applyAdvancedBtn">Apply</button>
+        <button class="btn btn-ghost" id="cancelAdvancedBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Sign-in gate -->
   <div id="authScreen">
@@ -743,16 +782,20 @@ let STATE = {
   todayBlocks: [
     { id:1, time:"7:30–8:05am", title:"School drop off", client:null,
       meta:"Recurring weekday commitment" },
-    { id:2, time:"8:05am–12:00pm", open:true, title:"Open",
+    { id:2, time:"8:05–10:00am", open:true, title:"Open",
       suggestion:"Nothing flagged in the Follow-Up Queue right now." },
-    { id:3, time:"12:00–1:00pm", title:"Andrew <> Jillian", client:"glyphic", isCoaching:true,
-      meta:"Google Meet · coaching, Glyphic Bio" },
-    { id:4, time:"1:00–2:00pm", title:"Jillian <> Courtney: Bi-Weekly Coaching", client:"courtney", isCoaching:true,
-      meta:"Coaching" },
-    { id:5, time:"2:00–2:45pm", open:true, title:"Open",
-      suggestion:"Nothing flagged in the Follow-Up Queue right now." },
-    { id:6, time:"2:45–4:00pm", title:"Soccer tryouts", client:null,
-      meta:"Turf tryouts 2:45-3:45, conditioning at LMS 3:45-4:00" },
+    { id:3, time:"10:00–11:00am", title:"Lisa S <> Jillian", client:"lisa-s", isCoaching:true,
+      meta:"Zoom · biweekly coaching" },
+    { id:4, time:"11:00am–12:00pm", title:"Coaching Session", client:"sgh-admin", isCoaching:true,
+      meta:"Zoom · with Melissa Purpura, Shino Takagi also invited" },
+    { id:5, time:"12:00–1:00pm", title:"Donna <> Jillian", client:"sgh-hr",
+      meta:"Zoom · SGH — HR & Corp Project" },
+    { id:6, time:"1:00–4:45pm", title:"Jamie & kiddos to swim?", client:null,
+      meta:"Loosely blocked personal plan — overlaps with soccer tryouts below, worth a quick check that both still work" },
+    { id:7, time:"2:45–4:00pm", title:"Soccer tryouts", client:null,
+      meta:"Turf tryouts 2:45-3:45, conditioning at LMS 3:45-4:00 — overlaps the swim block above" },
+    { id:8, time:"5:00–7:45pm", title:"Flag Football Combine", client:null,
+      meta:"Littleton Russell Street track — Skills Night, not a tryout" },
   ],
   clients: [
     { id:"glyphic",  name:"Glyphic Bio", meta:"Biotech · coaching 5 execs: Scotty, Josh, Lee, Sarah, Andrew",
@@ -787,7 +830,6 @@ let STATE = {
   // NOT block her own direct edits/adds via the Follow-Up Queue's add-row in the UI, which
   // are her own explicit input and need no separate confirmation step.
   followups: [
-    { id:1, client:"sakata", label:"Land on a time with Fiona for Carve AI - Sakata catchup — next steps on survey results (came back as no response)", days:2 },
   ],
 
   // Standing rule: only log an action here if the user explicitly stated, in her own
@@ -1181,6 +1223,43 @@ document.getElementById("historyList").addEventListener("click", async (e)=>{
 });
 
 document.getElementById("saveVersionBtn").addEventListener("click", saveVersionSnapshot);
+
+/* ---- Advanced: bulk edit modal ---- */
+function openAdvancedModal(){
+  document.getElementById("advancedModal").classList.add("open");
+  document.getElementById("advancedError").textContent = "";
+}
+function closeAdvancedModal(){
+  document.getElementById("advancedModal").classList.remove("open");
+}
+document.getElementById("advancedBtn").addEventListener("click", openAdvancedModal);
+document.getElementById("closeAdvancedBtn").addEventListener("click", closeAdvancedModal);
+document.getElementById("cancelAdvancedBtn").addEventListener("click", closeAdvancedModal);
+document.getElementById("advancedModal").addEventListener("click", (e)=>{
+  if(e.target.id === "advancedModal") closeAdvancedModal();
+});
+
+document.getElementById("loadAdvancedBtn").addEventListener("click", ()=>{
+  const key = document.getElementById("advancedSectionSelect").value;
+  document.getElementById("advancedTextarea").value = JSON.stringify(STATE[key], null, 2);
+  document.getElementById("advancedError").textContent = "";
+});
+
+document.getElementById("applyAdvancedBtn").addEventListener("click", ()=>{
+  const key = document.getElementById("advancedSectionSelect").value;
+  const raw = document.getElementById("advancedTextarea").value;
+  let parsed;
+  try{
+    parsed = JSON.parse(raw);
+  }catch(err){
+    document.getElementById("advancedError").textContent = "That's not valid JSON — " + err.message;
+    return;
+  }
+  STATE[key] = parsed;
+  markDirty();
+  renderAll();
+  closeAdvancedModal();
+});
 
 window.addEventListener("beforeunload", (e)=>{
   if(saveTimer){
