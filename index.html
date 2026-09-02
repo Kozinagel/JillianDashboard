@@ -448,6 +448,7 @@
         <button class="persist-btn" id="saveLocalBtn" style="display:none;">Save Data</button>
         <button class="persist-btn" id="goCloudBtn" style="display:none;">Set up cloud sync</button>
         <button class="persist-btn" id="advancedBtn">Advanced</button>
+        <button class="persist-btn" id="fixTodayBtn" style="background:var(--urgent-bg); color:var(--urgent); border-color:var(--urgent);">Fix Today's Data</button>
       </div>
       <div class="today-pill" id="todayPill"></div>
     </div>
@@ -1234,6 +1235,33 @@ function closeAdvancedModal(){
   document.getElementById("advancedModal").classList.remove("open");
 }
 document.getElementById("advancedBtn").addEventListener("click", openAdvancedModal);
+
+// One-click fix for the Sept 3 → Sept 2 data mix-up, no manual JSON pasting required.
+document.getElementById("fixTodayBtn").addEventListener("click", ()=>{
+  if(!confirm("Replace Today's Timeline and date label with the corrected Sept 2 schedule?")) return;
+  STATE.todayLabel = "Wed, Sept 2 · packed day, drop-off through Flag Football Combine tonight";
+  STATE.todayBlocks = [
+    { id:1, time:"7:30–8:05am", title:"School drop off", client:null,
+      meta:"Recurring weekday commitment" },
+    { id:2, time:"8:05–10:00am", open:true, title:"Open",
+      suggestion:"Nothing flagged in the Follow-Up Queue right now." },
+    { id:3, time:"10:00–11:00am", title:"Lisa S <> Jillian", client:"lisa-s", isCoaching:true,
+      meta:"Zoom · biweekly coaching" },
+    { id:4, time:"11:00am–12:00pm", title:"Coaching Session", client:"sgh-admin", isCoaching:true,
+      meta:"Zoom · with Melissa Purpura, Shino Takagi also invited" },
+    { id:5, time:"12:00–1:00pm", title:"Donna <> Jillian", client:"sgh-hr",
+      meta:"Zoom · SGH — HR & Corp Project" },
+    { id:6, time:"1:00–4:45pm", title:"Jamie & kiddos to swim?", client:null,
+      meta:"Loosely blocked personal plan — overlaps with soccer tryouts below, worth a quick check that both still work" },
+    { id:7, time:"2:45–4:00pm", title:"Soccer tryouts", client:null,
+      meta:"Turf tryouts 2:45-3:45, conditioning at LMS 3:45-4:00 — overlaps the swim block above" },
+    { id:8, time:"5:00–7:45pm", title:"Flag Football Combine", client:null,
+      meta:"Littleton Russell Street track — Skills Night, not a tryout" },
+  ];
+  markDirty();
+  renderAll();
+  alert("Fixed — Today's Timeline and date label are corrected.");
+});
 document.getElementById("closeAdvancedBtn").addEventListener("click", closeAdvancedModal);
 document.getElementById("cancelAdvancedBtn").addEventListener("click", closeAdvancedModal);
 document.getElementById("advancedModal").addEventListener("click", (e)=>{
