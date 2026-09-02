@@ -372,6 +372,15 @@
     white-space:nowrap;
   }
 
+  /* ---------- Live Recent Emails ---------- */
+  .email-row{ padding:10px 0; border-bottom:1px solid var(--line-soft); }
+  .email-row:last-child{ border-bottom:none; }
+  .email-row .email-top{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+  .email-row .email-subject{ font-size:13px; font-weight:700; }
+  .email-row .email-date{ font-size:11px; color:var(--ink-faint); white-space:nowrap; flex:none; }
+  .email-row .email-from{ font-size:12px; color:var(--ink-soft); margin-top:1px; }
+  .email-row .email-snippet{ font-size:12px; color:var(--ink-faint); margin-top:3px; }
+
   /* ---------- Non-Client Contacts ---------- */
   .contact-summary{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
   .cat-chip{
@@ -449,7 +458,7 @@
         <button class="persist-btn" id="saveLocalBtn" style="display:none;">Save Data</button>
         <button class="persist-btn" id="goCloudBtn" style="display:none;">Set up cloud sync</button>
         <button class="persist-btn" id="advancedBtn">Advanced</button>
-        <button class="persist-btn" id="connectCalendarBtn" style="background:var(--accent-pine-soft); color:var(--accent-pine); border-color:var(--accent-pine);">📅 Refresh from Calendar</button>
+        <button class="persist-btn" id="connectCalendarBtn" style="background:var(--accent-pine-soft); color:var(--accent-pine); border-color:var(--accent-pine);">📅 Refresh Live Data</button>
         <span class="save-status" id="calendarStatus"></span>
       </div>
       <div class="today-pill" id="todayPill"></div>
@@ -620,6 +629,19 @@
             <input type="number" id="followupDays" placeholder="Days" style="width:70px;" min="0" max="30">
             <button class="btn" id="addFollowupBtn">Add</button>
           </div>
+        </section>
+
+        <!-- Live Recent Emails — raw list, no interpretation. Click "Refresh from Calendar"
+             above (it pulls Gmail too now) to populate. Nothing here gets auto-added to
+             the Follow-Up Queue or Actions Due — that still requires your judgment/confirmation. -->
+        <section class="panel">
+          <div class="panel-head">
+            <div class="titles">
+              <span class="panel-title">Live Recent Emails</span>
+              <span class="badge">Raw · last 3 days, for your own review</span>
+            </div>
+          </div>
+          <div id="liveEmailsList"></div>
         </section>
 
         <!-- 5. Service Line Snapshot -->
@@ -905,7 +927,8 @@ let STATE = {
     { id:8, client:"sgh-hr", desc:"July 2026 invoice", amount:1050, status:"sent", sentDate:"2026-08-25", dueDate:"", kind:"fee" },
     { id:9, client:"lisa-c", desc:"Coaching session (Venmo)", amount:200, status:"paid", sentDate:"2026-08-27", dueDate:"2026-08-27", kind:"fee" },
     { id:10, client:"glyphic", desc:"August 2026 invoice", amount:1498.50, status:"sent", sentDate:"2026-09-01", dueDate:"", kind:"fee" },
-    { id:11, client:"sgh-admin", desc:"Jul & Aug 2026 combined invoice", amount:"", status:"sent", sentDate:"2026-09-01", dueDate:"", kind:"fee" },
+    { id:11, client:"sgh-admin", desc:"Jul & Aug 2026 combined invoice — approved for payment 9/2", amount:"", status:"sent", sentDate:"2026-09-01", dueDate:"", kind:"fee" },
+    { id:12, client:"sakata", desc:"50% deposit — paid (amount is a $6,500 estimate, half of $13K project total — confirm actual figure)", amount:6500, status:"paid", sentDate:"2026-08-16", dueDate:"", kind:"fee" },
   ],
 
   // Upcoming Invoices — invoices known/expected but not yet created. Same standing rule as
@@ -913,6 +936,7 @@ let STATE = {
   // Draft candidates in chat first with sources, let the user check off which are real, only
   // add here what she confirms. Starts empty on purpose.
   upcomingInvoices: [
+    { id:1, client:"sakata", desc:"Final invoice + expenses (lumped per Fiona's Aug 25 agreement) — final balance $7,000.00 + expenses $2,578.78", amount:9578.78, when:"TBD — pending send" },
   ],
 
   contacts: [
@@ -975,6 +999,10 @@ let STATE = {
   // hand-edited. Non-recurring events in the next 90 days, no client tagging attempted
   // (that requires judgment a raw API pull can't do).
   liveUpcoming: [],
+
+  // Populated live from Gmail via the same refresh button. Raw, unfiltered, last 3 days —
+  // deliberately no auto-flagging into Follow-Up Queue/Actions Due, per the standing rule.
+  liveEmails: [],
 };
 
 function clientById(id){ return STATE.clients.find(c => c.id === id); }
@@ -997,7 +1025,7 @@ function initGoogleAuth(){
   }
   googleTokenClient = google.accounts.oauth2.initTokenClient({
     client_id: GOOGLE_OAUTH_CLIENT_ID,
-    scope: "https://www.googleapis.com/auth/calendar.readonly",
+    scope: "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.readonly",
     callback: (resp) => {
       if(resp.error){
         setCalendarStatus("Calendar connection failed");
@@ -1030,13 +1058,66 @@ async function refreshLiveCalendar(){
   try{
     await refreshTodayFromCalendar();
     await refreshLookAheadFromCalendar();
+    await refreshLiveEmails();
     const stamp = new Date().toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
     setCalendarStatus("✓ Live as of " + stamp);
     markDirty();
   }catch(err){
     console.error(err);
-    setCalendarStatus("Calendar refresh failed — click to retry");
+    setCalendarStatus("Refresh failed — click to retry");
   }
+}
+
+/* ---------- Live Recent Emails (raw, no interpretation) ---------- */
+async function refreshLiveEmails(){
+  const listRes = await fetch(
+    "https://gmail.googleapis.com/gmail/v1/users/me/messages?q=" + encodeURIComponent("newer_than:3d") + "&maxResults=15",
+    { headers: { Authorization: `Bearer ${googleAccessToken}` } }
+  );
+  if(listRes.status === 401){
+    googleAccessToken = null;
+    throw new Error("Gmail session expired — click Refresh again to reconnect");
+  }
+  if(!listRes.ok) throw new Error("Gmail API error " + listRes.status);
+  const listData = await listRes.json();
+  const ids = (listData.messages || []).map(m => m.id);
+
+  const details = await Promise.all(ids.map(id =>
+    fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From`,
+      { headers: { Authorization: `Bearer ${googleAccessToken}` } }
+    ).then(r => r.ok ? r.json() : null)
+  ));
+
+  STATE.liveEmails = details.filter(Boolean).map(msg => {
+    const headers = (msg.payload && msg.payload.headers) || [];
+    const subject = (headers.find(h => h.name === "Subject") || {}).value || "(no subject)";
+    const from = (headers.find(h => h.name === "From") || {}).value || "";
+    return {
+      subject, from,
+      snippet: msg.snippet || "",
+      dateLabel: new Date(Number(msg.internalDate)).toLocaleDateString("en-US", {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"})
+    };
+  }).sort((a,b) => b.dateLabel.localeCompare(a.dateLabel));
+
+  renderLiveEmails();
+}
+
+function renderLiveEmails(){
+  const el = document.getElementById("liveEmailsList");
+  if(!el) return;
+  if(!STATE.liveEmails || STATE.liveEmails.length === 0){
+    el.innerHTML = `<div class="empty-state">Nothing pulled yet — click "Refresh Live Data" above.</div>`;
+    return;
+  }
+  el.innerHTML = STATE.liveEmails.map(e => `
+    <div class="email-row">
+      <div class="email-top">
+        <span class="email-subject">${e.subject}</span>
+        <span class="email-date">${e.dateLabel}</span>
+      </div>
+      <div class="email-from">${e.from}</div>
+      <div class="email-snippet">${e.snippet}</div>
+    </div>`).join("");
 }
 
 async function fetchCalendarEvents(start, end){
@@ -1301,6 +1382,7 @@ function loadIntoState(obj){
   STATE.contacts = obj.contacts || [];
   STATE.familyItems = obj.familyItems || STATE.familyItems;
   STATE.liveUpcoming = obj.liveUpcoming || [];
+  STATE.liveEmails = obj.liveEmails || [];
   renderAll();
   suppressDirty = false;
 }
@@ -1981,6 +2063,7 @@ function renderAll(){
   renderClientRoster();
   renderFamilyItems();
   renderLiveUpcoming();
+  renderLiveEmails();
 }
 
 /* =========================================================
