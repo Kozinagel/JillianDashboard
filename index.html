@@ -465,6 +465,7 @@
       <p class="panel-note" style="margin-bottom:10px;">Pick a section, edit the JSON directly, click Apply. One save instead of many clicks — use this whenever a bulk correction (like a wrong date across several entries) makes individual edits impractical.</p>
       <div class="add-row" style="margin-bottom:10px;">
         <select id="advancedSectionSelect">
+          <option value="todayLabel">Today's Date Label</option>
           <option value="todayBlocks">Today's Timeline</option>
           <option value="followups">Client Follow-Up Queue</option>
           <option value="actions">Actions Due</option>
@@ -522,7 +523,7 @@
           <div class="panel-head">
             <div class="titles">
               <span class="panel-title">Today at a Glance</span>
-              <span class="badge">Synced · Calendar, Gmail &amp; Slack, Sept 3</span>
+              <span class="badge">Synced · Calendar, Gmail &amp; Slack, Sept 2</span>
             </div>
             <span class="panel-note" id="todayLabelText"></span>
           </div>
@@ -778,7 +779,7 @@ const PREP_STYLES = {
    ========================================================= */
 
 let STATE = {
-  todayLabel: "Thu, Sept 3 · school in full swing, soccer tryouts continue",
+  todayLabel: "Wed, Sept 2 · packed day, drop-off through Flag Football Combine tonight",
   todayBlocks: [
     { id:1, time:"7:30–8:05am", title:"School drop off", client:null,
       meta:"Recurring weekday commitment" },
@@ -2240,7 +2241,7 @@ document.getElementById("addFamilyBtn").addEventListener("click", ()=>{
 /* =========================================================
    INIT (non-auth parts — safe to run before sign-in resolves)
    ========================================================= */
-document.getElementById("todayPill").textContent = "Thursday, September 3, 2026";
+document.getElementById("todayPill").textContent = "Wednesday, September 2, 2026";
 document.getElementById("contactCategorySelect").innerHTML = categoryOptionsHtml("");
 renderAll(); // renders the seeded starter data immediately; loadFromFirestore() overwrites it after sign-in
 </script>
