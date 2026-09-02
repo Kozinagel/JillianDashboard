@@ -1052,6 +1052,39 @@ document.getElementById("connectCalendarBtn").addEventListener("click", ()=>{
   googleTokenClient.requestAccessToken({ prompt: googleAccessToken ? "" : "consent" });
 });
 
+/* ---- Live Recent Emails events ---- */
+document.getElementById("liveEmailsList").addEventListener("click", (e)=>{
+  const delBtn = e.target.closest("[data-action='email-delete']");
+  if(delBtn){
+    const id = Number(delBtn.dataset.id);
+    STATE.liveEmails = STATE.liveEmails.filter(x => x.id !== id);
+    renderLiveEmails();
+    return;
+  }
+  const taskBtn = e.target.closest("[data-action='email-task']");
+  if(taskBtn){
+    const id = Number(taskBtn.dataset.id);
+    openEmailTaskId = (openEmailTaskId === id) ? null : id;
+    renderLiveEmails();
+    return;
+  }
+  const confirmBtn = e.target.closest("[data-action='email-task-confirm']");
+  if(confirmBtn){
+    const id = Number(confirmBtn.dataset.id);
+    const form = confirmBtn.closest(".bt-form");
+    const label = form.querySelector(".email-task-label").value.trim();
+    if(!label) return;
+    const client = form.querySelector(".email-task-client").value || null;
+    const days = Number(form.querySelector(".email-task-days").value) || 3;
+    const nextId = STATE.actions.length ? Math.max(...STATE.actions.map(a=>a.id))+1 : 1;
+    STATE.actions.push({ id:nextId, client, label, days, done:false });
+    openEmailTaskId = null;
+    markDirty();
+    renderActions();
+    renderLiveEmails();
+  }
+});
+
 async function refreshLiveCalendar(){
   if(!googleAccessToken) return;
   setCalendarStatus("Refreshing…");
@@ -1088,11 +1121,12 @@ async function refreshLiveEmails(){
     ).then(r => r.ok ? r.json() : null)
   ));
 
-  STATE.liveEmails = details.filter(Boolean).map(msg => {
+  STATE.liveEmails = details.filter(Boolean).map((msg, i) => {
     const headers = (msg.payload && msg.payload.headers) || [];
     const subject = (headers.find(h => h.name === "Subject") || {}).value || "(no subject)";
     const from = (headers.find(h => h.name === "From") || {}).value || "";
     return {
+      id: i + 1,
       subject, from,
       snippet: msg.snippet || "",
       dateLabel: new Date(Number(msg.internalDate)).toLocaleDateString("en-US", {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"})
@@ -1102,6 +1136,7 @@ async function refreshLiveEmails(){
   renderLiveEmails();
 }
 
+let openEmailTaskId = null;
 function renderLiveEmails(){
   const el = document.getElementById("liveEmailsList");
   if(!el) return;
@@ -1113,12 +1148,30 @@ function renderLiveEmails(){
     <div class="email-row">
       <div class="email-top">
         <span class="email-subject">${e.subject}</span>
-        <span class="email-date">${e.dateLabel}</span>
+        <div style="display:flex; gap:6px; align-items:center; flex:none;">
+          <span class="email-date">${e.dateLabel}</span>
+          <button class="icon-btn" data-action="email-task" data-id="${e.id}" title="Create a task from this email">＋Task</button>
+          <button class="icon-btn" data-action="email-delete" data-id="${e.id}" title="Remove from this list">✕</button>
+        </div>
       </div>
       <div class="email-from">${e.from}</div>
       <div class="email-snippet">${e.snippet}</div>
+      ${openEmailTaskId === e.id ? renderEmailTaskForm(e) : ""}
     </div>`).join("");
 }
+
+function renderEmailTaskForm(e){
+  const opts = `<option value="">— No client (personal/other) —</option>` +
+    STATE.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+  return `<div class="bt-form" data-id="${e.id}" style="margin-top:8px;">
+    <input type="text" class="email-task-label" value="${escAttr(e.subject)}" style="flex:1; min-width:180px;">
+    <select class="email-task-client">${opts}</select>
+    <span class="bt-field-label">Days</span>
+    <input type="number" class="email-task-days" value="3" min="0" max="30">
+    <button class="bt-save" data-action="email-task-confirm" data-id="${e.id}">Add to Actions Due</button>
+  </div>`;
+}
+
 
 async function fetchCalendarEvents(start, end){
   const params = new URLSearchParams({
