@@ -1663,15 +1663,16 @@ function loadIntoState(obj){
   STATE.familyItems = obj.familyItems || STATE.familyItems;
 
   // Forced one-time database fix (Sept 3): whatever is saved for invoices/billingTerms/
-  // hoursLog gets overwritten with the corrected data below, exactly once. This runs
-  // automatically the next time the dashboard is opened and signed into — no manual paste,
-  // no Advanced editor, nothing to click. STATE.dataFixVersion tracks that it already ran,
-  // so it won't repeat and won't stomp on anything you edit after this loads.
-  const CURRENT_DATA_FIX_VERSION = 2;
+  // hoursLog/ytdReceivedBaseline gets overwritten with the corrected data below, exactly
+  // once. This runs automatically the next time the dashboard is opened and signed into —
+  // no manual paste, no Advanced editor, nothing to click. STATE.dataFixVersion tracks that
+  // it already ran, so it won't repeat and won't stomp on anything you edit after this loads.
+  const CURRENT_DATA_FIX_VERSION = 3;
   if(!obj.dataFixVersion || obj.dataFixVersion < CURRENT_DATA_FIX_VERSION){
     STATE.invoices = JSON.parse(JSON.stringify(SEED_INVOICES));
     STATE.billingTerms = JSON.parse(JSON.stringify(SEED_BILLING_TERMS));
     STATE.hoursLog = JSON.parse(JSON.stringify(SEED_HOURS_LOG));
+    STATE.ytdReceivedBaseline = 0;
     STATE.dataFixVersion = CURRENT_DATA_FIX_VERSION;
     renderAll();
     suppressDirty = false;
@@ -2490,24 +2491,35 @@ function renderMonthlySummary(){
   const bt = STATE.billingTerms[clientId];
   const rate = bt && bt.hourlyRate ? bt.hourlyRate : (bt && bt.prepayRate ? bt.prepayRate : null);
 
-  const entries = STATE.hoursLog.filter(h => h.client === clientId).sort((a,b) => (a.date||"").localeCompare(b.date||""));
-
-  const byMonth = {};
-  entries.forEach(h => {
+  // Source 1: real session-level detail, where it exists (currently just Glyphic).
+  const hourEntries = STATE.hoursLog.filter(h => h.client === clientId).sort((a,b) => (a.date||"").localeCompare(b.date||""));
+  const hoursByMonth = {};
+  hourEntries.forEach(h => {
     const key = (h.date || "").slice(0,7) || "undated";
-    (byMonth[key] = byMonth[key] || []).push(h);
+    (hoursByMonth[key] = hoursByMonth[key] || []).push(h);
+  });
+
+  // Source 2: actual invoiced amounts (sent or paid — not "pending", since that's not
+  // invoiced yet) from the Invoice Board. This is complete and accurate for every client,
+  // matching your sheet exactly, regardless of whether session-level detail exists.
+  const invoicedEntries = STATE.invoices.filter(i =>
+    i.client === clientId && i.kind !== "reimbursement" && (i.status === "sent" || i.status === "paid")
+  ).sort((a,b) => (a.sentDate||"").localeCompare(b.sentDate||""));
+  const invoicesByMonth = {};
+  invoicedEntries.forEach(inv => {
+    const key = (inv.sentDate || "").slice(0,7) || "undated";
+    (invoicesByMonth[key] = invoicesByMonth[key] || []).push(inv);
   });
 
   // Dropdown always offers the full current year (Jan-Dec), regardless of which months
-  // actually have logged sessions — picking an empty month just shows "no sessions yet"
-  // rather than being unselectable. From November onward, next year's 12 months are added
-  // too, so year-end planning doesn't need to wait for January 1st. This is computed fresh
+  // actually have data — picking an empty month just shows "nothing yet" rather than being
+  // unselectable. From November onward, next year's 12 months are added too. Computed fresh
   // from the real date on every render, so it advances on its own — nothing to maintain.
   const now = new Date();
   const currentYear = now.getFullYear();
   const dropdownKeys = [];
   for(let m=0; m<12; m++){ dropdownKeys.push(`${currentYear}-${String(m+1).padStart(2,"0")}`); }
-  if(now.getMonth() >= 10){ // November (0-indexed 10) or December
+  if(now.getMonth() >= 10){
     for(let m=0; m<12; m++){ dropdownKeys.push(`${currentYear+1}-${String(m+1).padStart(2,"0")}`); }
   }
 
@@ -2519,62 +2531,90 @@ function renderMonthlySummary(){
   if(dropdownKeys.includes(prevMonthVal)) monthSel.value = prevMonthVal;
   const filterMonth = monthSel.value;
 
-  if(entries.length === 0 && !filterMonth){ el.innerHTML = `<div class="empty-state">No sessions logged for this client yet.</div>`; return; }
+  // Every month that has EITHER kind of data, picking session-level detail over the invoice
+  // fallback whenever both exist for the same month (so Glyphic keeps its per-session rows
+  // rather than being flattened to one invoice line).
+  const allMonthKeys = new Set([...Object.keys(hoursByMonth), ...Object.keys(invoicesByMonth)]);
+  const populatedMonthKeys = [...allMonthKeys].sort();
+  const keysToShow = filterMonth ? [filterMonth] : populatedMonthKeys;
 
-  // YTD banner — current calendar year, regardless of which month is being viewed below
-  const thisYear = new Date().getFullYear().toString();
-  let ytdHours = 0, ytdFee = 0;
-  entries.forEach(h => {
-    if((h.date||"").startsWith(thisYear) && (h.status||"Complete") !== "No-show"){
-      ytdHours += h.hours;
-      if(rate) ytdFee += h.hours * rate;
+  // YTD banner — sums whichever source each month actually used, so nothing double-counts.
+  const thisYear = now.getFullYear().toString();
+  let ytdHours = 0, ytdFee = 0, ytdHasHours = false;
+  populatedMonthKeys.filter(k => k.startsWith(thisYear)).forEach(monthKey => {
+    if(hoursByMonth[monthKey]){
+      ytdHasHours = true;
+      hoursByMonth[monthKey].forEach(h => {
+        if((h.status||"Complete") !== "No-show"){
+          ytdHours += h.hours;
+          if(rate) ytdFee += h.hours * rate;
+        }
+      });
+    } else if(invoicesByMonth[monthKey]){
+      invoicesByMonth[monthKey].forEach(inv => { ytdFee += Number(inv.amount) || 0; });
     }
   });
   const ytdBanner = `<div class="summary-ytd">
     <span>YTD ${thisYear}</span>
-    <span>${ytdHours.toLocaleString(undefined,{maximumFractionDigits:2})} hrs</span>
-    <span>${rate ? "$"+ytdFee.toLocaleString(undefined,{maximumFractionDigits:2}) : "—"}</span>
+    <span>${ytdHasHours ? ytdHours.toLocaleString(undefined,{maximumFractionDigits:2})+" hrs" : ""}</span>
+    <span>$${ytdFee.toLocaleString(undefined,{maximumFractionDigits:2})}</span>
   </div>`;
 
-  const populatedMonthKeys = Object.keys(byMonth).sort();
-  const keysToShow = filterMonth ? [filterMonth] : populatedMonthKeys;
-
-  if(keysToShow.length === 0){
-    el.innerHTML = ytdBanner + `<div class="empty-state">No sessions logged for this client yet.</div>`;
+  if(keysToShow.length === 0 || (keysToShow.length === 1 && !hoursByMonth[keysToShow[0]] && !invoicesByMonth[keysToShow[0]])){
+    el.innerHTML = ytdBanner + `<div class="empty-state">${populatedMonthKeys.length === 0 ? "Nothing logged or invoiced for this client yet." : "Nothing this month."}</div>`;
     return;
   }
 
   el.innerHTML = ytdBanner + keysToShow.map(monthKey => {
-    const rows = byMonth[monthKey] || [];
     const monthLabel = monthKey === "undated" ? "Undated" :
       new Date(monthKey + "-01T00:00:00").toLocaleDateString("en-US", {month:"long", year:"numeric"});
-    if(rows.length === 0){
+    const hourRows = hoursByMonth[monthKey];
+    const invRows = invoicesByMonth[monthKey];
+
+    if(!hourRows && !invRows){
       return `<div class="summary-month">
         <div class="summary-month-head"><span>${monthLabel}</span></div>
-        <div class="empty-state">No sessions logged yet.</div>
+        <div class="empty-state">Nothing this month.</div>
       </div>`;
     }
-    let monthHours = 0, monthFee = 0;
-    const rowsHtml = rows.map(h => {
-      const status = h.status || "Complete";
-      const isNoShow = status === "No-show";
-      const fee = (!isNoShow && rate) ? h.hours * rate : 0;
-      if(!isNoShow){ monthHours += h.hours; monthFee += fee; }
-      return `<div class="summary-row ${isNoShow ? "noshow" : ""}">
-        <div>${fmtDate(h.date)}</div>
-        <div>${h.note || ""}</div>
-        <div class="sr-hours">${h.hours}h</div>
-        <div class="sr-fee">${rate ? "$"+fee.toLocaleString(undefined,{maximumFractionDigits:2}) : "—"}</div>
-        <div>${status}</div>
-        <button class="icon-btn" data-action="delete-summary-row" data-id="${h.id}" title="Delete this session">✕</button>
-      </div>`;
-    }).join("");
+
+    let monthHours = 0, monthFee = 0, rowsHtml;
+
+    if(hourRows){
+      rowsHtml = hourRows.map(h => {
+        const status = h.status || "Complete";
+        const isNoShow = status === "No-show";
+        const fee = (!isNoShow && rate) ? h.hours * rate : 0;
+        if(!isNoShow){ monthHours += h.hours; monthFee += fee; }
+        return `<div class="summary-row ${isNoShow ? "noshow" : ""}">
+          <div>${fmtDate(h.date)}</div>
+          <div>${h.note || ""}</div>
+          <div class="sr-hours">${h.hours}h</div>
+          <div class="sr-fee">${rate ? "$"+fee.toLocaleString(undefined,{maximumFractionDigits:2}) : "—"}</div>
+          <div>${status}</div>
+          <button class="icon-btn" data-action="delete-summary-row" data-id="${h.id}" title="Delete this session">✕</button>
+        </div>`;
+      }).join("");
+    } else {
+      rowsHtml = invRows.map(inv => {
+        monthFee += Number(inv.amount) || 0;
+        return `<div class="summary-row">
+          <div>${fmtDate(inv.sentDate)}</div>
+          <div>${inv.desc}${inv.invoiceNumber ? ` <span style="color:var(--ink-faint);">#${inv.invoiceNumber}</span>` : ""}</div>
+          <div class="sr-hours">—</div>
+          <div class="sr-fee">$${Number(inv.amount).toLocaleString(undefined,{maximumFractionDigits:2})}</div>
+          <div>${inv.status === "paid" ? "Paid" : "Sent"}</div>
+          <div></div>
+        </div>`;
+      }).join("");
+    }
+
     return `<div class="summary-month">
       <div class="summary-month-head"><span>${monthLabel}</span></div>
       ${rowsHtml}
       <div class="summary-total">
-        <span>${monthHours.toLocaleString(undefined,{maximumFractionDigits:2})} hrs</span>
-        <span>${rate ? "$"+monthFee.toLocaleString(undefined,{maximumFractionDigits:2}) : ""}</span>
+        <span>${hourRows ? monthHours.toLocaleString(undefined,{maximumFractionDigits:2})+" hrs" : ""}</span>
+        <span>$${monthFee.toLocaleString(undefined,{maximumFractionDigits:2})}</span>
       </div>
     </div>`;
   }).join("");
