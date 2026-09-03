@@ -443,21 +443,24 @@
 
   /* ---------- Client Roster ---------- */
   .cr-row{
-    display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--line-soft); flex-wrap:wrap;
+    display:grid; grid-template-columns: 1fr 240px 190px 28px; gap:12px; align-items:start;
+    padding:12px 0; border-bottom:1px solid var(--line-soft);
   }
   .cr-row:last-child{ border-bottom:none; }
-  .cr-fields{ display:flex; flex-direction:column; gap:6px; flex:1; min-width:220px; }
+  .cr-fields{ display:flex; flex-direction:column; gap:6px; min-width:0; }
   .cr-fields input{
     font-size:13px; padding:7px 9px; border-radius:6px; border:1px solid var(--line); background:var(--paper); color:var(--ink);
+    width:100%; box-sizing:border-box;
   }
   .cr-fields input.cr-name{ font-weight:700; }
-  .cr-engagements{ display:flex; flex-wrap:wrap; gap:8px 12px; flex:none; max-width:340px; }
+  .cr-engagements{ display:flex; flex-direction:column; flex-wrap:wrap; gap:6px; min-width:0; }
   .cr-check{ display:flex; align-items:center; gap:5px; font-size:11.5px; color:var(--ink-soft); font-weight:600; white-space:nowrap; }
-  .cr-check input{ accent-color: var(--ink); }
-  .cr-prep-select{
-    font-size:11.5px; font-weight:700; padding:6px 9px; border-radius:6px; border:1px solid var(--line);
-    background:#fff; color:var(--ink-soft); flex:none;
+  .cr-check input{ accent-color: var(--ink); flex:none; }
+  .cr-billing{
+    display:flex; flex-direction:column; align-items:flex-start; gap:3px; min-width:0;
   }
+  .cr-billing .bt-terms{ word-break:break-word; }
+  .cr-billing .bt-edit{ margin-top:2px; }
   .prep-badge{
     font-size:10px; font-weight:700; padding:2px 7px; border-radius:5px; text-transform:uppercase; letter-spacing:.02em; white-space:nowrap;
   }
@@ -474,6 +477,35 @@
   .empty-state{ font-size:13px; color:var(--ink-faint); padding:10px 0; }
 
   footer{ margin-top:26px; font-size:11.5px; color:var(--ink-faint); text-align:center; }
+
+  /* ---------- Page navigation ---------- */
+  .page-nav{ display:flex; gap:6px; margin-bottom:18px; }
+  .page-nav-btn{
+    font-size:13px; font-weight:700; padding:9px 18px; border-radius:9px; border:1px solid var(--line);
+    background:var(--paper-raised); color:var(--ink-soft); cursor:pointer; box-shadow:var(--shadow);
+  }
+  .page-nav-btn.active{ background:var(--ink); color:#fff; border-color:var(--ink); }
+  .page-nav-btn:hover:not(.active){ background:var(--paper); color:var(--ink); }
+
+  .log-call-row{ display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+
+  /* ---------- Monthly Summary ---------- */
+  .summary-month{ margin-bottom:18px; }
+  .summary-month-head{
+    display:flex; align-items:center; justify-content:space-between; font-size:12.5px; font-weight:700;
+    color:var(--ink-soft); text-transform:uppercase; letter-spacing:.03em; padding-bottom:6px; border-bottom:1px solid var(--line);
+    margin-bottom:6px;
+  }
+  .summary-row{
+    display:grid; grid-template-columns: 90px 1fr 70px 70px 70px; gap:8px; align-items:center;
+    padding:6px 0; border-bottom:1px solid var(--line-soft); font-size:12.5px;
+  }
+  .summary-row.noshow{ color:var(--ink-faint); text-decoration:line-through; }
+  .summary-row .sr-hours{ text-align:right; font-variant-numeric:tabular-nums; }
+  .summary-row .sr-fee{ text-align:right; font-variant-numeric:tabular-nums; color:var(--ink-soft); }
+  .summary-total{
+    display:flex; justify-content:space-between; font-size:13px; font-weight:700; padding-top:6px; margin-top:2px;
+  }
 </style>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
@@ -537,6 +569,30 @@
     </div>
   </div>
 
+  <!-- Log a Call -->
+  <div id="logCallModal" class="modal-overlay">
+    <div class="modal-card" style="max-width:480px;">
+      <div class="modal-head">
+        <h3 class="display">Log a Call</h3>
+        <button class="modal-close" id="closeLogCallBtn" title="Close">✕</button>
+      </div>
+      <div class="add-row" style="flex-direction:column; align-items:stretch;">
+        <select id="logCallClientSelect"></select>
+        <textarea id="logCallText" class="advanced-textarea" style="min-height:80px;" placeholder="e.g. just spoke w Sophia from Radar 6-7 pm et — or note an overage on a scheduled call"></textarea>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <span class="bt-field-label">Hours</span>
+          <input type="number" id="logCallHours" step="0.25" min="0" style="width:90px;">
+          <span class="panel-note" id="logCallParseNote"></span>
+        </div>
+      </div>
+      <div class="auth-error" id="logCallError"></div>
+      <div class="add-row" style="margin-top:10px;">
+        <button class="btn" id="saveLogCallBtn">Log it</button>
+        <button class="btn btn-ghost" id="cancelLogCallBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Sign-in gate -->
   <div id="authScreen">
     <div class="auth-card">
@@ -563,6 +619,18 @@
 
   <!-- ============ WORKING VIEW ============ -->
   <div id="workingView">
+
+    <div class="page-nav">
+      <button class="page-nav-btn active" data-page="main">Main</button>
+      <button class="page-nav-btn" data-page="invoicing">Invoicing &amp; Roster</button>
+      <button class="page-nav-btn" data-page="contacts">Non-Clients</button>
+    </div>
+
+    <div id="page-main" class="page">
+    <div class="log-call-row">
+      <button class="btn" id="logCallBtn">📞 Log a Call</button>
+      <span class="panel-note">For ad hoc or overtime calls — logs straight into that client's Hours Log</span>
+    </div>
     <div class="grid">
       <div class="col">
 
@@ -571,7 +639,7 @@
           <div class="panel-head">
             <div class="titles">
               <span class="panel-title">Today at a Glance</span>
-              <span class="badge">Synced · Calendar, Gmail &amp; Slack, Sept 2</span>
+              <span class="badge">Synced · Calendar, Gmail &amp; Slack, Sept 3</span>
             </div>
             <span class="panel-note" id="todayLabelText"></span>
           </div>
@@ -678,7 +746,9 @@
 
       </div>
     </div>
+    </div>
 
+    <div id="page-invoicing" class="page" style="display:none;">
     <!-- 6. Invoicing Cycle -->
     <section class="panel" style="margin-top:18px;">
       <div class="panel-head">
@@ -736,22 +806,55 @@
         <button class="btn" id="addInvoiceBtn">Add invoice</button>
       </div>
 
-      <p class="inv-subhead" style="margin-top:22px;">Billing Terms by Client</p>
-      <div id="billingTermsList"></div>
-
       <p class="inv-subhead" style="margin-top:22px;">Hours Log</p>
       <div id="hoursLogList"></div>
       <div class="add-row">
         <select id="hlClientSelect"></select>
         <input type="date" id="hlDateInput">
         <input type="number" id="hlHoursInput" placeholder="Hours" step="0.25" style="width:80px;">
-        <input type="text" id="hlNoteInput" placeholder="Note (optional)">
+        <input type="text" id="hlNoteInput" placeholder="Note (e.g. Scotty · 3:30-4:30pm)">
+        <select id="hlStatusInput">
+          <option value="Complete">Complete</option>
+          <option value="No-show">No-show</option>
+        </select>
         <button class="btn" id="addHoursBtn">Log hours</button>
       </div>
     </section>
 
-    <!-- 7. Non-Client Contacts -->
+    <!-- Monthly Summary -->
     <section class="panel" style="margin-top:18px;">
+      <div class="panel-head">
+        <div class="titles">
+          <span class="panel-title">Monthly Summary</span>
+        </div>
+        <span class="panel-note">Auto-generated from the Hours Log above — edit a session there and this updates</span>
+      </div>
+      <div class="add-row" style="margin-bottom:14px;">
+        <select id="summaryClientSelect"></select>
+      </div>
+      <div id="monthlySummaryList"></div>
+    </section>
+
+    <!-- 8. Client Roster -->
+    <section class="panel" style="margin-top:18px;">
+      <div class="panel-head">
+        <div class="titles">
+          <span class="panel-title">Client Roster</span>
+        </div>
+        <span class="panel-note">Rename clients, edit notes, re-tag service lines, set prep style, or add/remove clients — everything downstream updates automatically</span>
+      </div>
+      <div id="clientRosterList"></div>
+      <div class="cr-add-row">
+        <input type="text" id="crNameInput" placeholder="New client / company name">
+        <input type="text" id="crMetaInput" placeholder="Notes (contacts, cadence, etc.)" style="flex:1;">
+        <button class="btn" id="addClientBtn">Add client</button>
+      </div>
+    </section>
+    </div>
+
+    <div id="page-contacts" class="page" style="display:none;">
+    <!-- 7. Non-Client Contacts -->
+    <section class="panel">
       <div class="panel-head">
         <div class="titles">
           <span class="panel-title">Non-Client Contacts</span>
@@ -770,22 +873,7 @@
         <button class="btn" id="addContactBtn">Add contact</button>
       </div>
     </section>
-
-    <!-- 8. Client Roster -->
-    <section class="panel" style="margin-top:18px;">
-      <div class="panel-head">
-        <div class="titles">
-          <span class="panel-title">Client Roster</span>
-        </div>
-        <span class="panel-note">Rename clients, edit notes, re-tag service lines, set prep style, or add/remove clients — everything downstream updates automatically</span>
-      </div>
-      <div id="clientRosterList"></div>
-      <div class="cr-add-row">
-        <input type="text" id="crNameInput" placeholder="New client / company name">
-        <input type="text" id="crMetaInput" placeholder="Notes (contacts, cadence, etc.)" style="flex:1;">
-        <button class="btn" id="addClientBtn">Add client</button>
-      </div>
-    </section>
+    </div>
   </div>
 
   <footer>Calendar &amp; Gmail sections reflect a synced snapshot, not a live connection · Everything else on this page is editable and saves to your data file</footer>
@@ -827,24 +915,24 @@ const PREP_STYLES = {
    ========================================================= */
 
 let STATE = {
-  todayLabel: "Wed, Sept 2 · packed day, drop-off through Flag Football Combine tonight",
+  todayLabel: "Thu, Sept 3 · lighter day, coaching + a Sakata follow-up",
   todayBlocks: [
     { id:1, time:"7:30–8:05am", title:"School drop off", client:null,
       meta:"Recurring weekday commitment" },
-    { id:2, time:"8:05–10:00am", open:true, title:"Open",
+    { id:2, time:"8:05–11:30am", open:true, title:"Open",
       suggestion:"Nothing flagged in the Follow-Up Queue right now." },
-    { id:3, time:"10:00–11:00am", title:"Lisa S <> Jillian", client:"lisa-s", isCoaching:true,
-      meta:"Zoom · biweekly coaching" },
-    { id:4, time:"11:00am–12:00pm", title:"Coaching Session", client:"sgh-admin", isCoaching:true,
-      meta:"Zoom · with Melissa Purpura, Shino Takagi also invited" },
-    { id:5, time:"12:00–1:00pm", title:"Donna <> Jillian", client:"sgh-hr",
-      meta:"Zoom · SGH — HR & Corp Project" },
-    { id:6, time:"1:00–4:45pm", title:"Jamie & kiddos to swim?", client:null,
-      meta:"Loosely blocked personal plan — overlaps with soccer tryouts below, worth a quick check that both still work" },
-    { id:7, time:"2:45–4:00pm", title:"Soccer tryouts", client:null,
-      meta:"Turf tryouts 2:45-3:45, conditioning at LMS 3:45-4:00 — overlaps the swim block above" },
-    { id:8, time:"5:00–7:45pm", title:"Flag Football Combine", client:null,
-      meta:"Littleton Russell Street track — Skills Night, not a tryout" },
+    { id:3, time:"11:30am–12:00pm", title:"Riv chiro", client:null,
+      meta:"River's appointment — on Dan's calendar" },
+    { id:4, time:"12:00–1:00pm", title:"Andrew <> Jillian", client:"glyphic", isCoaching:true,
+      meta:"Google Meet · coaching, Glyphic Bio" },
+    { id:5, time:"1:00–2:00pm", title:"Jillian <> Courtney: Bi-Weekly Coaching", client:"courtney", isCoaching:true,
+      meta:"Coaching" },
+    { id:6, time:"2:00–2:40pm", open:true, title:"Open",
+      suggestion:"Nothing flagged in the Follow-Up Queue right now." },
+    { id:7, time:"2:40–3:10pm", title:"Jillian + Fi Sakata follow ups", client:"sakata",
+      meta:"Landing next steps after the survey came back with no responses" },
+    { id:8, time:"3:10–7:00pm", open:true, title:"Open",
+      suggestion:"Nothing flagged in the Follow-Up Queue right now." },
   ],
 
   // Standing rule (added per user request, after real spelling errors on Kim Woellec and
@@ -934,10 +1022,16 @@ let STATE = {
 
   // Hours logged for hourly-billed clients, accumulated between invoices
   hoursLog: [
-    { id:1, client:"glyphic", date:"2026-08-04", hours:2.25, note:"Scotty weekly", invoiced:true },
-    { id:2, client:"glyphic", date:"2026-08-11", hours:2.25, note:"Scotty weekly", invoiced:true },
-    { id:3, client:"sgh-hr", date:"2026-08-06", hours:1.5, note:"Alissa + Title Project discussion", invoiced:false },
-    { id:4, client:"sgh-admin", date:"2026-07-31", hours:2, note:"July hours — per invoicing sheet, $700 still pending", invoiced:true },
+    { id:1, client:"glyphic", date:"2026-08-03", hours:1, note:"Scotty · 3:30-4:30pm", invoiced:true },
+    { id:2, client:"glyphic", date:"2026-08-04", hours:1, note:"Sarah · 5:00-6:00pm", invoiced:true },
+    { id:3, client:"glyphic", date:"2026-08-04", hours:1, note:"Josh · 7:00-8:00pm", invoiced:true },
+    { id:4, client:"glyphic", date:"2026-08-06", hours:1, note:"Andrew · 12:00-1:00pm", invoiced:true },
+    { id:5, client:"glyphic", date:"2026-08-09", hours:1.25, note:"Josh · 2:00-3:15pm", invoiced:true },
+    { id:6, client:"glyphic", date:"2026-08-19", hours:1, note:"Scotty · 6:00-7:00pm", invoiced:true },
+    { id:7, client:"glyphic", date:"2026-08-26", hours:1, note:"Sarah · 5:00-6:00pm", invoiced:true },
+    { id:8, client:"glyphic", date:"2026-08-31", hours:1, note:"Scotty · 3:00-4:00pm", invoiced:true },
+    { id:9, client:"sgh-hr", date:"2026-08-06", hours:1.5, note:"Alissa + Title Project discussion", invoiced:false },
+    { id:10, client:"sgh-admin", date:"2026-07-31", hours:2, note:"July hours — per invoicing sheet, $700 still pending", invoiced:true },
   ],
 
   // Annual revenue target and the running 2026 baseline from your invoicing sheet
@@ -957,7 +1051,7 @@ let STATE = {
     { id:7, client:"radar", desc:"10-hr prepay coaching package (Aug+ batch) — paid via ACH", amount:3750, status:"paid", sentDate:"2026-08-24", dueDate:"", kind:"fee" },
     { id:8, client:"sgh-hr", desc:"July 2026 invoice", amount:1050, status:"sent", sentDate:"2026-08-25", dueDate:"", kind:"fee" },
     { id:9, client:"lisa-c", desc:"Coaching session (Venmo)", amount:200, status:"paid", sentDate:"2026-08-27", dueDate:"2026-08-27", kind:"fee" },
-    { id:10, client:"glyphic", desc:"August 2026 invoice", amount:1498.50, status:"sent", sentDate:"2026-09-01", dueDate:"", kind:"fee" },
+    { id:10, client:"glyphic", desc:"August 2026 invoice — 8.25 hrs, per real invoice PDF", amount:2747.25, status:"sent", sentDate:"2026-09-01", dueDate:"", kind:"fee" },
     { id:11, client:"sgh-admin", desc:"Jul & Aug 2026 combined invoice — approved for payment 9/2", amount:"", status:"sent", sentDate:"2026-09-01", dueDate:"", kind:"fee" },
     { id:12, client:"sakata", desc:"50% deposit — paid (amount is a $6,500 estimate, half of $13K project total — confirm actual figure)", amount:6500, status:"paid", sentDate:"2026-08-16", dueDate:"", kind:"fee" },
     { id:13, client:"sakata", desc:"Final invoice + expenses (lumped per Fiona's Aug 25 agreement) — final balance $7,000.00 + expenses $2,578.78", amount:9578.78, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
@@ -1166,6 +1260,10 @@ async function refreshTodayFromCalendar(){
 
   STATE.todayBlocks = blocks;
   STATE.todayLabel = now.toLocaleDateString("en-US", {weekday:"short", month:"short", day:"numeric"}) + " · live from Calendar";
+  document.getElementById("todayPill").textContent = now.toLocaleDateString("en-US", {weekday:"long", month:"long", day:"numeric", year:"numeric"});
+  const badgeMonthDay = now.toLocaleDateString("en-US", {month:"short", day:"numeric"});
+  const badgeEl = document.querySelector("#page-main .badge");
+  if(badgeEl) badgeEl.textContent = "Synced · Calendar, Gmail & Slack, " + badgeMonthDay;
   renderToday();
 }
 
@@ -1482,6 +1580,80 @@ document.getElementById("applyAdvancedBtn").addEventListener("click", ()=>{
   closeAdvancedModal();
 });
 
+/* ---- Log a Call ---- */
+// Lightweight time-range parse: "6-7 pm", "6:15-6:45pm", "6 to 7pm" etc. If only one side
+// has am/pm, applies it to both. Bounded to 0-6 hours and rounded to the nearest 15 min;
+// anything it can't confidently read just leaves the Hours field for manual entry.
+function parseCallDuration(text){
+  const re = /(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:-|–|to)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i;
+  const m = text.match(re);
+  if(!m) return null;
+  let [, h1, mi1, ap1, h2, mi2, ap2] = m;
+  h1 = parseInt(h1,10); h2 = parseInt(h2,10);
+  mi1 = mi1 ? parseInt(mi1,10) : 0; mi2 = mi2 ? parseInt(mi2,10) : 0;
+  ap1 = ap1 ? ap1.toLowerCase() : null; ap2 = ap2 ? ap2.toLowerCase() : null;
+  if(!ap1 && ap2) ap1 = ap2;
+  if(!ap2 && ap1) ap2 = ap1;
+  if(!ap1){ ap1 = "pm"; ap2 = "pm"; } // reasonable default for business calls if truly unmarked
+  function to24(h, ap){ h = h % 12; if(ap === "pm") h += 12; return h; }
+  const start = to24(h1, ap1) + mi1/60;
+  let end = to24(h2, ap2) + mi2/60;
+  if(end <= start) end += 12;
+  const dur = end - start;
+  if(dur <= 0 || dur > 6) return null;
+  return Math.round(dur * 4) / 4;
+}
+
+function openLogCallModal(){
+  const opts = STATE.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
+  document.getElementById("logCallClientSelect").innerHTML = opts;
+  document.getElementById("logCallText").value = "";
+  document.getElementById("logCallHours").value = "";
+  document.getElementById("logCallParseNote").textContent = "";
+  document.getElementById("logCallError").textContent = "";
+  document.getElementById("logCallModal").classList.add("open");
+}
+function closeLogCallModal(){
+  document.getElementById("logCallModal").classList.remove("open");
+}
+document.getElementById("logCallBtn").addEventListener("click", openLogCallModal);
+document.getElementById("closeLogCallBtn").addEventListener("click", closeLogCallModal);
+document.getElementById("cancelLogCallBtn").addEventListener("click", closeLogCallModal);
+document.getElementById("logCallModal").addEventListener("click", (e)=>{
+  if(e.target.id === "logCallModal") closeLogCallModal();
+});
+
+document.getElementById("logCallText").addEventListener("input", (e)=>{
+  const dur = parseCallDuration(e.target.value);
+  const noteEl = document.getElementById("logCallParseNote");
+  if(dur){
+    document.getElementById("logCallHours").value = dur;
+    noteEl.textContent = `Read as ${dur} hr${dur===1?"":"s"} — adjust if that's not right`;
+  } else {
+    noteEl.textContent = "Couldn't read a time range — enter hours manually";
+  }
+});
+
+document.getElementById("saveLogCallBtn").addEventListener("click", ()=>{
+  const clientSel = document.getElementById("logCallClientSelect");
+  const textInput = document.getElementById("logCallText");
+  const hoursInput = document.getElementById("logCallHours");
+  const hours = Number(hoursInput.value);
+  if(!hours || hours <= 0){
+    document.getElementById("logCallError").textContent = "Enter the number of hours (or a time range it can read).";
+    return;
+  }
+  const nextId = STATE.hoursLog.length ? Math.max(...STATE.hoursLog.map(h=>h.id))+1 : 1;
+  STATE.hoursLog.push({
+    id:nextId, client:clientSel.value, date:new Date().toISOString().slice(0,10),
+    hours, note: textInput.value.trim() || "Logged call", invoiced:false
+  });
+  markDirty();
+  renderHoursLog();
+  renderReceivablesSummary();
+  closeLogCallModal();
+});
+
 window.addEventListener("beforeunload", (e)=>{
   if(saveTimer){
     e.preventDefault();
@@ -1715,28 +1887,6 @@ function uninvoicedHours(clientId){
 }
 
 let openBillingEditId = null;
-function renderBillingTerms(){
-  const el = document.getElementById("billingTermsList");
-  el.innerHTML = STATE.clients.map(c => {
-    const bt = STATE.billingTerms[c.id] || { type:null };
-    const terms = formatTerms(bt);
-    const editing = openBillingEditId === c.id;
-    const uh = bt.type === "hourly" ? uninvoicedHours(c.id) : 0;
-    const uhText = uh > 0 ? `<div class="bt-terms">${uh} hrs logged, not yet invoiced ≈ $${(uh * (bt.hourlyRate||0)).toLocaleString(undefined,{maximumFractionDigits:2})}</div>` : "";
-    const renewBadge = (bt.type === "prepay" && terms.remaining !== undefined && terms.remaining <= 2) ? `<span class="renew-badge">⚑ Renew soon</span>` : "";
-    return `<div class="bt-row">
-      <div class="bt-top">
-        <div>
-          <div class="bt-name">${c.name}${renewBadge}</div>
-          <div class="bt-terms ${terms.unset ? "unset":""}">${terms.text}</div>
-          ${uhText}
-        </div>
-        <button class="bt-edit" data-action="toggle-bt-edit" data-id="${c.id}">${editing ? "Close" : "Edit"}</button>
-      </div>
-      ${editing ? renderBillingForm(c.id, bt) : ""}
-    </div>`;
-  }).join("");
-}
 
 function renderBillingForm(clientId, bt){
   const type = bt.type || "";
@@ -1894,16 +2044,65 @@ function renderHoursLog(){
   if(sorted.length === 0){ el.innerHTML = `<div class="empty-state">No hours logged yet.</div>`; return; }
   el.innerHTML = sorted.map(h => {
     const c = clientById(h.client);
+    const status = h.status || "Complete";
     return `<div class="hl-row ${h.invoiced ? "invoiced":""}">
       <div class="hl-date">${fmtDate(h.date)}</div>
       <div class="hl-client">${c ? c.name : "—"}</div>
       <div class="hl-hours">${h.hours} hr${h.hours===1?"":"s"}</div>
-      <div class="hl-note">${h.note||""}</div>
+      <div class="hl-note">${h.note||""} ${status==="No-show" ? `<span class="kind-badge">No-show</span>` : ""}</div>
       <label class="hl-check">
         <input type="checkbox" data-action="toggle-hl-invoiced" data-id="${h.id}" ${h.invoiced?"checked":""}>
         Invoiced
       </label>
+      <button class="icon-btn" data-action="toggle-hl-status" data-id="${h.id}" title="Toggle No-show">${status==="No-show"?"↺":"⊘"}</button>
       <button class="icon-btn" data-action="delete-hl" data-id="${h.id}" title="Delete">✕</button>
+    </div>`;
+  }).join("");
+}
+
+function renderMonthlySummary(){
+  const clientSel = document.getElementById("summaryClientSelect");
+  const el = document.getElementById("monthlySummaryList");
+  const clientId = clientSel.value;
+  if(!clientId){ el.innerHTML = `<div class="empty-state">Pick a client above.</div>`; return; }
+
+  const bt = STATE.billingTerms[clientId];
+  const rate = bt && bt.hourlyRate ? bt.hourlyRate : (bt && bt.prepayRate ? bt.prepayRate : null);
+
+  const entries = STATE.hoursLog.filter(h => h.client === clientId).sort((a,b) => (a.date||"").localeCompare(b.date||""));
+  if(entries.length === 0){ el.innerHTML = `<div class="empty-state">No sessions logged for this client yet.</div>`; return; }
+
+  const byMonth = {};
+  entries.forEach(h => {
+    const key = (h.date || "").slice(0,7) || "undated";
+    (byMonth[key] = byMonth[key] || []).push(h);
+  });
+
+  el.innerHTML = Object.keys(byMonth).sort().map(monthKey => {
+    const rows = byMonth[monthKey];
+    const monthLabel = monthKey === "undated" ? "Undated" :
+      new Date(monthKey + "-01T00:00:00").toLocaleDateString("en-US", {month:"long", year:"numeric"});
+    let monthHours = 0, monthFee = 0;
+    const rowsHtml = rows.map(h => {
+      const status = h.status || "Complete";
+      const isNoShow = status === "No-show";
+      const fee = (!isNoShow && rate) ? h.hours * rate : 0;
+      if(!isNoShow){ monthHours += h.hours; monthFee += fee; }
+      return `<div class="summary-row ${isNoShow ? "noshow" : ""}">
+        <div>${fmtDate(h.date)}</div>
+        <div>${h.note || ""}</div>
+        <div class="sr-hours">${h.hours}h</div>
+        <div class="sr-fee">${rate ? "$"+fee.toLocaleString(undefined,{maximumFractionDigits:2}) : "—"}</div>
+        <div>${status}</div>
+      </div>`;
+    }).join("");
+    return `<div class="summary-month">
+      <div class="summary-month-head"><span>${monthLabel}</span></div>
+      ${rowsHtml}
+      <div class="summary-total">
+        <span>${monthHours.toLocaleString(undefined,{maximumFractionDigits:2})} hrs</span>
+        <span>${rate ? "$"+monthFee.toLocaleString(undefined,{maximumFractionDigits:2}) : ""}</span>
+      </div>
     </div>`;
   }).join("");
 }
@@ -1945,7 +2144,14 @@ function renderContacts(){
 function renderClientRoster(){
   const el = document.getElementById("clientRosterList");
   if(STATE.clients.length === 0){ el.innerHTML = `<div class="empty-state">No clients yet. Add one below.</div>`; return; }
-  el.innerHTML = STATE.clients.map(c => `
+  el.innerHTML = STATE.clients.map(c => {
+    const bt = STATE.billingTerms[c.id] || { type:null };
+    const terms = formatTerms(bt);
+    const editingBilling = openBillingEditId === c.id;
+    const uh = bt.type === "hourly" ? uninvoicedHours(c.id) : 0;
+    const uhText = uh > 0 ? `<div class="bt-terms">${uh} hrs logged, not yet invoiced ≈ $${(uh * (bt.hourlyRate||0)).toLocaleString(undefined,{maximumFractionDigits:2})}</div>` : "";
+    const renewBadge = (bt.type === "prepay" && terms.remaining !== undefined && terms.remaining <= 2) ? `<span class="renew-badge">⚑ Renew soon</span>` : "";
+    return `
     <div class="cr-row">
       <div class="cr-fields">
         <input type="text" class="cr-name" data-field="name" data-id="${c.id}" value="${escAttr(c.name)}" placeholder="Client / company name">
@@ -1958,11 +2164,15 @@ function renderClientRoster(){
             ${sl.label}
           </label>`).join("")}
       </div>
-      <select class="cr-prep-select" data-action="set-prep-style" data-id="${c.id}" title="Does this client typically need session prep?">
-        ${Object.entries(PREP_STYLES).map(([key, ps]) => `<option value="${key}" ${((c.prepStyle||"none")===key)?"selected":""}>${ps.label}</option>`).join("")}
-      </select>
+      <div class="cr-billing">
+        <div class="bt-terms ${terms.unset ? "unset":""}">${terms.text}${renewBadge}</div>
+        ${uhText}
+        <button class="bt-edit" data-action="toggle-bt-edit" data-id="${c.id}">${editingBilling ? "Close" : "Edit billing"}</button>
+      </div>
       <button class="icon-btn" data-action="delete-client" data-id="${c.id}" title="Delete client">✕</button>
-    </div>`).join("");
+      ${editingBilling ? renderBillingForm(c.id, bt) : ""}
+    </div>`;
+  }).join("");
 }
 
 /* ---------- Family & School Watch ---------- */
@@ -1997,6 +2207,11 @@ function populateInlineClientSelects(){
   document.getElementById("followupClientSelect").innerHTML = opts;
   document.getElementById("hlClientSelect").innerHTML = opts;
   document.getElementById("tbClientSelect").innerHTML = `<option value="">— No client (personal/other) —</option>` + opts;
+  document.getElementById("logCallClientSelect").innerHTML = opts;
+  const summarySel = document.getElementById("summaryClientSelect");
+  const prevVal = summarySel.value;
+  summarySel.innerHTML = `<option value="">— Pick a client —</option>` + opts;
+  if(prevVal) summarySel.value = prevVal;
 }
 
 function renderAll(){
@@ -2007,11 +2222,11 @@ function renderAll(){
   renderBucketTabs();
   renderLookAhead();
   renderServiceSnapshot();
-  renderBillingTerms();
   renderInvoiceBoard();
   renderReceivablesSummary();
   renderInvoiceChecklist();
   renderHoursLog();
+  renderMonthlySummary();
   renderContacts();
   renderClientRoster();
   renderFamilyItems();
@@ -2163,12 +2378,12 @@ document.getElementById("addLaBtn").addEventListener("click", ()=>{
 });
 
 /* ---- Billing Terms events ---- */
-document.getElementById("billingTermsList").addEventListener("click", (e)=>{
+document.getElementById("clientRosterList").addEventListener("click", (e)=>{
   const toggleBtn = e.target.closest("[data-action='toggle-bt-edit']");
   if(toggleBtn){
     const id = toggleBtn.dataset.id;
     openBillingEditId = (openBillingEditId === id) ? null : id;
-    renderBillingTerms();
+    renderClientRoster();
     return;
   }
   const saveBtn = e.target.closest("[data-action='save-bt']");
@@ -2189,11 +2404,11 @@ document.getElementById("billingTermsList").addEventListener("click", (e)=>{
     }
     STATE.billingTerms[id] = bt;
     openBillingEditId = null;
-    markDirty(); renderBillingTerms();
+    markDirty(); renderClientRoster();
   }
 });
 
-document.getElementById("billingTermsList").addEventListener("change", (e)=>{
+document.getElementById("clientRosterList").addEventListener("change", (e)=>{
   if(!e.target.classList.contains("bt-type-select")) return;
   const form = e.target.closest(".bt-form");
   const clientId = form.dataset.client;
@@ -2265,15 +2480,23 @@ document.getElementById("hoursLogList").addEventListener("change", (e)=>{
   if(!cb) return;
   const id = Number(cb.dataset.id);
   const h = STATE.hoursLog.find(x=>x.id===id);
-  if(h){ h.invoiced = cb.checked; markDirty(); renderHoursLog(); renderBillingTerms(); renderReceivablesSummary(); }
+  if(h){ h.invoiced = cb.checked; markDirty(); renderHoursLog(); renderClientRoster(); renderReceivablesSummary(); }
 });
 
 document.getElementById("hoursLogList").addEventListener("click", (e)=>{
   const del = e.target.closest("[data-action='delete-hl']");
-  if(!del) return;
-  const id = Number(del.dataset.id);
-  STATE.hoursLog = STATE.hoursLog.filter(x=>x.id!==id);
-  markDirty(); renderHoursLog(); renderBillingTerms(); renderReceivablesSummary();
+  if(del){
+    const id = Number(del.dataset.id);
+    STATE.hoursLog = STATE.hoursLog.filter(x=>x.id!==id);
+    markDirty(); renderHoursLog(); renderClientRoster(); renderReceivablesSummary(); renderMonthlySummary();
+    return;
+  }
+  const statusBtn = e.target.closest("[data-action='toggle-hl-status']");
+  if(statusBtn){
+    const id = Number(statusBtn.dataset.id);
+    const h = STATE.hoursLog.find(x=>x.id===id);
+    if(h){ h.status = (h.status === "No-show") ? "Complete" : "No-show"; markDirty(); renderHoursLog(); renderMonthlySummary(); renderReceivablesSummary(); }
+  }
 });
 
 document.getElementById("addHoursBtn").addEventListener("click", ()=>{
@@ -2281,17 +2504,20 @@ document.getElementById("addHoursBtn").addEventListener("click", ()=>{
   const dateInput = document.getElementById("hlDateInput");
   const hoursInput = document.getElementById("hlHoursInput");
   const noteInput = document.getElementById("hlNoteInput");
+  const statusInput = document.getElementById("hlStatusInput");
   const hours = Number(hoursInput.value);
   if(!hours) return;
   const nextId = STATE.hoursLog.length ? Math.max(...STATE.hoursLog.map(h=>h.id))+1 : 1;
   STATE.hoursLog.push({
     id:nextId, client:clientSel.value,
     date: dateInput.value || new Date().toISOString().slice(0,10),
-    hours, note: noteInput.value.trim(), invoiced:false
+    hours, note: noteInput.value.trim(), status: statusInput.value, invoiced:false
   });
   hoursInput.value = ""; noteInput.value = ""; dateInput.value = "";
-  markDirty(); renderHoursLog(); renderBillingTerms(); renderReceivablesSummary();
+  markDirty(); renderHoursLog(); renderClientRoster(); renderReceivablesSummary(); renderMonthlySummary();
 });
+
+document.getElementById("summaryClientSelect").addEventListener("change", renderMonthlySummary);
 
 /* ---- Non-Client Contacts events ---- */
 document.getElementById("contactsList").addEventListener("change", (e)=>{
@@ -2378,12 +2604,6 @@ document.getElementById("clientRosterList").addEventListener("change", (e)=>{
     markDirty(); renderServiceSnapshot();
     return;
   }
-  const prepSel = e.target.closest("[data-action='set-prep-style']");
-  if(prepSel){
-    const id = prepSel.dataset.id;
-    const c = clientById(id);
-    if(c){ c.prepStyle = prepSel.value; markDirty(); renderToday(); }
-  }
 });
 
 document.getElementById("clientRosterList").addEventListener("click", (e)=>{
@@ -2438,10 +2658,21 @@ document.getElementById("addFamilyBtn").addEventListener("click", ()=>{
   markDirty(); renderFamilyItems();
 });
 
+/* ---- Page navigation ---- */
+document.querySelectorAll(".page-nav-btn").forEach(btn => {
+  btn.addEventListener("click", ()=>{
+    const page = btn.dataset.page;
+    document.querySelectorAll(".page-nav-btn").forEach(b => b.classList.toggle("active", b === btn));
+    document.querySelectorAll(".page").forEach(p => {
+      p.style.display = (p.id === "page-" + page) ? "block" : "none";
+    });
+  });
+});
+
 /* =========================================================
    INIT (non-auth parts — safe to run before sign-in resolves)
    ========================================================= */
-document.getElementById("todayPill").textContent = "Wednesday, September 2, 2026";
+document.getElementById("todayPill").textContent = "Thursday, September 3, 2026";
 document.getElementById("contactCategorySelect").innerHTML = categoryOptionsHtml("");
 renderAll(); // renders the seeded starter data immediately; loadFromFirestore() overwrites it after sign-in
 initGoogleAuth(); // sets up the Calendar OAuth token client, separate from Firebase login
