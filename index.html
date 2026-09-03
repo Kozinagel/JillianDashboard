@@ -4,6 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Working Dashboard — Jillian Hufnagel</title>
+
+<!-- iOS "Add to Home Screen" support -->
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="152x152" href="apple-touch-icon-152.png">
+<link rel="apple-touch-icon" sizes="167x167" href="apple-touch-icon-167.png">
+<link rel="icon" type="image/png" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Dashboard">
+<meta name="theme-color" content="#1B2430">
+
 <style>
   :root{
     --paper:#F2F3EF;
@@ -312,6 +323,8 @@
   .board-card .bc-amount{ font-size:13.5px; font-weight:700; font-variant-numeric:tabular-nums; }
   .board-card .bc-date{ font-size:10.5px; color:var(--ink-faint); }
   .board-card .bc-actions{ display:flex; gap:5px; margin-top:8px; flex-wrap:wrap; }
+  .board-card .bc-inv-number{ font-size:10.5px; color:var(--ink-faint); margin-bottom:4px; }
+  .mini-btn.primary{ background:var(--ink); color:#fff; border-color:var(--ink); }
   .board-empty{ font-size:11.5px; color:var(--ink-faint); text-align:center; padding:14px 8px; }
   .inv-subhead{ font-size:12.5px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.04em; margin:0 0 10px; }
 
@@ -497,7 +510,7 @@
     margin-bottom:6px;
   }
   .summary-row{
-    display:grid; grid-template-columns: 90px 1fr 70px 70px 70px; gap:8px; align-items:center;
+    display:grid; grid-template-columns: 90px 1fr 70px 70px 70px 24px; gap:8px; align-items:center;
     padding:6px 0; border-bottom:1px solid var(--line-soft); font-size:12.5px;
   }
   .summary-row.noshow{ color:var(--ink-faint); text-decoration:line-through; }
@@ -506,8 +519,39 @@
   .summary-total{
     display:flex; justify-content:space-between; font-size:13px; font-weight:700; padding-top:6px; margin-top:2px;
   }
+  .summary-ytd{
+    display:flex; justify-content:space-between; align-items:center; font-size:14px; font-weight:700;
+    background:var(--accent-pine-soft); color:var(--accent-pine); border-radius:9px; padding:10px 14px; margin-bottom:16px;
+  }
+
+  /* ---------- Quarterly Tax Estimate ---------- */
+  .tax-summary{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
+  .tax-rate-input{ width:70px; }
+  .tax-quarters{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+  .tax-q-tile{ background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
+  .tax-q-tile .lbl{ font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:var(--ink-faint); margin-bottom:4px; }
+  .tax-q-tile .val{ font-size:16px; font-weight:700; font-variant-numeric:tabular-nums; }
+  @media (max-width:700px){ .tax-quarters{ grid-template-columns:1fr 1fr; } }
+
+  /* ---------- Self-Pay Dashboard ---------- */
+  .selfpay-strip{ display:flex; flex-wrap:wrap; gap:10px; }
+  .selfpay-tile{
+    background:var(--calm-bg); border:1px solid var(--line); border-radius:10px; padding:10px 14px; flex:1; min-width:150px;
+  }
+  .selfpay-tile .lbl{ font-size:11.5px; font-weight:700; color:var(--ink-soft); }
+  .selfpay-tile .val{ font-size:15px; font-weight:700; font-variant-numeric:tabular-nums; margin-top:2px; }
+  .selfpay-tile.total{ background:var(--ink); }
+  .selfpay-tile.total .lbl{ color:rgba(255,255,255,.7); }
+  .selfpay-tile.total .val{ color:#fff; }
+
+  /* ---------- Business Info ---------- */
+  .biz-info-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px; }
+  .biz-info-grid input{
+    font-size:13px; padding:8px 10px; border-radius:7px; border:1px solid var(--line); background:var(--paper); color:var(--ink);
+  }
 </style>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
 <div id="app">
@@ -766,12 +810,40 @@
         <div class="target-bar-track"><div class="target-bar-fill" id="targetProgressFill"></div></div>
         <div class="target-progress-text" id="targetProgressText"></div>
       </div>
-      <p class="inv-subhead" style="margin-top:2px; font-weight:400; text-transform:none; letter-spacing:0; color:var(--ink-faint);">YTD Received includes $74,081.50 already collected in 2026 before this tracker started (from your invoicing sheet), plus anything logged above. Your sheet also projects ~$36,500 more in pipeline through year-end from recurring monthly billings, the Constructive Bio renewal, and Nova's Q4 events.</p>
+      <p class="inv-subhead" style="margin-top:2px; font-weight:400; text-transform:none; letter-spacing:0; color:var(--ink-faint);">YTD Received, Outstanding, and Pending are now built entirely from the invoices logged in the board below — every real 2026 payment, sent invoice, and projected pipeline item from your sheet is its own line item, not a lump estimate.</p>
+
+      <p class="inv-subhead" style="margin-top:18px;">Estimated Quarterly Taxes</p>
+      <p class="panel-note" style="margin:-4px 0 10px;">Same math as your sheet: rate × (YTD Received + Outstanding + Pending), split evenly across 4 quarters. Not tax advice — just your own formula, automated.</p>
+      <div class="tax-summary">
+        <span class="target-label">Tax rate</span>
+        <input type="number" id="taxRateInput" class="target-input tax-rate-input">
+        <span class="panel-note">%</span>
+        <span class="panel-note" id="taxBaseText"></span>
+      </div>
+      <div class="tax-quarters" id="taxQuarters"></div>
+
+      <p class="inv-subhead" style="margin-top:18px;">Excluded from Revenue &amp; Taxes</p>
+      <p class="panel-note" style="margin:-4px 0 10px;">Self-pay/Venmo clients (Lisa S, Lisa C, Regina, Courtney, Clodagh) plus anything tracked in a separate part of your sheet (Carve AI - Sakata) — none of this feeds the Pending/Outstanding/YTD Received tiles or the tax estimate above.</p>
+      <div id="selfPayDashboard"></div>
 
       <p class="inv-subhead">This Month's Invoicing Checklist</p>
       <div id="invoiceChecklist" style="margin-bottom:22px;"></div>
 
-      <p class="inv-subhead">Invoice Board</p>
+      <p class="inv-subhead">Business Info &amp; Payment Details</p>
+      <p class="panel-note" style="margin:-4px 0 10px;">Used to generate your invoice PDFs. This saves to your private database only — never hardcoded in the page's public source code, since your repo is public.</p>
+      <div class="biz-info-grid">
+        <input type="text" id="bizName" placeholder="Business name">
+        <input type="text" id="bizAddress" placeholder="Address">
+        <input type="text" id="bizPhone" placeholder="Phone">
+        <input type="text" id="bizEmail" placeholder="Email">
+        <input type="text" id="bizEin" placeholder="EIN">
+        <input type="text" id="bizBankName" placeholder="Bank name">
+        <input type="text" id="bizBankAccount" placeholder="Account number">
+        <input type="text" id="bizAchRouting" placeholder="ACH routing number">
+      </div>
+      <button class="btn btn-ghost" id="saveBizInfoBtn" style="margin-top:8px;">Save</button>
+
+      <p class="inv-subhead" style="margin-top:22px;">Invoice Board</p>
       <p class="panel-note" style="margin:-4px 0 10px;">Pending → Sent → Paid. Click a column header to expand/collapse.</p>
       <div class="board" id="invoiceBoard">
         <div class="board-col pending">
@@ -806,8 +878,8 @@
         <button class="btn" id="addInvoiceBtn">Add invoice</button>
       </div>
 
-      <p class="inv-subhead" style="margin-top:22px;">Hours Log</p>
-      <div id="hoursLogList"></div>
+      <p class="inv-subhead" style="margin-top:22px;">Log Hours</p>
+      <p class="panel-note" style="margin:-4px 0 10px;">Feeds directly into the Monthly Summary below — no separate list here anymore.</p>
       <div class="add-row">
         <select id="hlClientSelect"></select>
         <input type="date" id="hlDateInput">
@@ -831,6 +903,7 @@
       </div>
       <div class="add-row" style="margin-bottom:14px;">
         <select id="summaryClientSelect"></select>
+        <select id="summaryMonthSelect"><option value="">All months</option></select>
       </div>
       <div id="monthlySummaryList"></div>
     </section>
@@ -1010,51 +1083,179 @@ let STATE = {
     fundomo:   { type:"prepay", prepayHours:20, prepayRate:375, prepayHoursUsed:0 },
     generate:  { type:"prepay", prepayHours:20, prepayRate:375, prepayHoursUsed:20 },
     radar:     { type:"prepay", prepayHours:10, prepayRate:375, prepayHoursUsed:0 },
-    sakata:    { type:"project", projectTotal:13000, projectRate:null },
+    sakata:    { type:"project", projectTotal:13000, projectRate:null, excludeFromRevenue:true },
     nova:      { type:"hourly", hourlyRate:100 },
     brittany:  { type:"prepay", prepayHours:10, prepayRate:350, prepayHoursUsed:0 },
-    "lisa-s":  { type:"prepay", prepayHours:10, prepayRate:200, prepayHoursUsed:0 },
-    courtney:  { type:"hourly", hourlyRate:150 },
-    "lisa-c":  { type:"prepay", prepayHours:10, prepayRate:200, prepayHoursUsed:0 },
-    regina:    { type:"prepay", prepayHours:10, prepayRate:200, prepayHoursUsed:0 },
-    clodagh:   { type:"hourly", hourlyRate:375 },
+    "lisa-s":  { type:"prepay", prepayHours:10, prepayRate:200, prepayHoursUsed:0, selfPay:true },
+    courtney:  { type:"hourly", hourlyRate:150, selfPay:true },
+    "lisa-c":  { type:"prepay", prepayHours:10, prepayRate:200, prepayHoursUsed:0, selfPay:true },
+    regina:    { type:"prepay", prepayHours:10, prepayRate:200, prepayHoursUsed:0, selfPay:true },
+    clodagh:   { type:"hourly", hourlyRate:375, selfPay:true },
   },
 
   // Hours logged for hourly-billed clients, accumulated between invoices
+  // Rebuilt Sept 3 to match your hours-tracking sheet exactly, session by session, for
+  // Glyphic (the client where I have full session-level detail). For SGH-hr/SGH-admin I only
+  // have monthly invoice totals, not a session log — those are clearly labeled as aggregates
+  // below, not real session data. No 2026 Glyphic row had an expenses-included note in
+  // column F, so none of these needed the fee/reimbursement split.
   hoursLog: [
-    { id:1, client:"glyphic", date:"2026-08-03", hours:1, note:"Scotty · 3:30-4:30pm", invoiced:true },
-    { id:2, client:"glyphic", date:"2026-08-04", hours:1, note:"Sarah · 5:00-6:00pm", invoiced:true },
-    { id:3, client:"glyphic", date:"2026-08-04", hours:1, note:"Josh · 7:00-8:00pm", invoiced:true },
-    { id:4, client:"glyphic", date:"2026-08-06", hours:1, note:"Andrew · 12:00-1:00pm", invoiced:true },
-    { id:5, client:"glyphic", date:"2026-08-09", hours:1.25, note:"Josh · 2:00-3:15pm", invoiced:true },
-    { id:6, client:"glyphic", date:"2026-08-19", hours:1, note:"Scotty · 6:00-7:00pm", invoiced:true },
-    { id:7, client:"glyphic", date:"2026-08-26", hours:1, note:"Sarah · 5:00-6:00pm", invoiced:true },
-    { id:8, client:"glyphic", date:"2026-08-31", hours:1, note:"Scotty · 3:00-4:00pm", invoiced:true },
-    { id:9, client:"sgh-hr", date:"2026-08-06", hours:1.5, note:"Alissa + Title Project discussion", invoiced:false },
-    { id:10, client:"sgh-admin", date:"2026-07-31", hours:2, note:"July hours — per invoicing sheet, $700 still pending", invoiced:true },
+    // ---- Jan 2026 ----
+    { id:1, client:"glyphic", date:"2026-01-06", hours:1, note:"Scotty · 2:00-3:00pm", invoiced:true },
+    { id:2, client:"glyphic", date:"2026-01-14", hours:0.5, note:"Scotty · 4:30-5:00pm", invoiced:true },
+    { id:3, client:"glyphic", date:"2026-01-20", hours:1, note:"Lee · 3:00-4:00pm", invoiced:true },
+    { id:4, client:"glyphic", date:"2026-01-21", hours:1, note:"Scotty · 4:00-5:00pm", invoiced:true },
+    { id:5, client:"glyphic", date:"2026-01-29", hours:1, note:"Josh · 7:00-8:00pm", invoiced:true },
+    // ---- Feb 2026 ----
+    { id:6, client:"glyphic", date:"2026-02-04", hours:1, note:"Scotty · 4:30-5:30pm", invoiced:true },
+    { id:7, client:"glyphic", date:"2026-02-11", hours:0.75, note:"Scotty · 2:15-3:00pm", invoiced:true },
+    { id:8, client:"glyphic", date:"2026-02-18", hours:1, note:"Scotty · 4:00-5:00pm", invoiced:true },
+    { id:9, client:"glyphic", date:"2026-02-19", hours:1, note:"Josh · 6:00-7:00pm", invoiced:true },
+    { id:10, client:"glyphic", date:"2026-02-27", hours:1, note:"Scotty · 8:00-9:00pm", invoiced:true },
+    // ---- Mar 2026 ----
+    { id:11, client:"glyphic", date:"2026-03-05", hours:1, note:"Josh · 3:30-4:30pm", invoiced:true },
+    { id:12, client:"glyphic", date:"2026-03-10", hours:1.25, note:"Lee · 6:30-7:45pm", invoiced:true },
+    { id:13, client:"glyphic", date:"2026-03-19", hours:1, note:"Josh · 7:30-8:30pm", invoiced:true },
+    { id:14, client:"glyphic", date:"2026-03-25", hours:1, note:"Andrew · 12:00-1:00pm", invoiced:true },
+    { id:15, client:"glyphic", date:"2026-03-27", hours:0.5, note:"Carsten · 11:00-11:30am (360 chat)", invoiced:true },
+    { id:16, client:"glyphic", date:"2026-03-30", hours:1, note:"Josh · 7:00-8:00pm", invoiced:true },
+    // ---- Apr 2026 ----
+    { id:17, client:"glyphic", date:"2026-04-01", hours:1, note:"Scotty · 4:00-5:00pm", invoiced:true },
+    { id:18, client:"glyphic", date:"2026-04-03", hours:1, note:"Sarah · 2:00-3:00pm", invoiced:true },
+    { id:19, client:"glyphic", date:"2026-04-08", hours:1, note:"Scotty · 4:00-5:00pm", invoiced:true },
+    { id:20, client:"glyphic", date:"2026-04-16", hours:1, note:"Sarah · 4:30-5:00pm (sheet lists 60 min)", invoiced:true },
+    { id:21, client:"glyphic", date:"2026-04-20", hours:1, note:"Josh · 7:00-8:00pm", invoiced:true },
+    { id:22, client:"glyphic", date:"2026-04-29", hours:0.5, note:"Scotty · 4:30-5:00pm", invoiced:true },
+    { id:23, client:"glyphic", date:"2026-04-30", hours:1, note:"Lee · 12:00-1:00pm", invoiced:true },
+    { id:24, client:"glyphic", date:"2026-04-30", hours:1, note:"Josh · 3:30-4:30pm", invoiced:true },
+    // ---- May 2026 ----
+    { id:25, client:"glyphic", date:"2026-05-06", hours:0.58333, note:"Scotty · 3:40-4:15pm", invoiced:true },
+    { id:26, client:"glyphic", date:"2026-05-06", hours:1, note:"Sarah · 5:00-6:00pm", invoiced:true },
+    { id:27, client:"glyphic", date:"2026-05-13", hours:1, note:"Scotty · 4:00-5:00pm", invoiced:true },
+    { id:28, client:"glyphic", date:"2026-05-15", hours:1, note:"Sarah · 2:00-3:00pm", invoiced:true },
+    { id:29, client:"glyphic", date:"2026-05-18", hours:0.75, note:"Scotty · 10:30-11:15am", invoiced:true },
+    { id:30, client:"glyphic", date:"2026-05-28", hours:0.5, note:"Josh · 7:00-7:30pm (sheet lists 30 min)", invoiced:true },
+    { id:31, client:"glyphic", date:"2026-05-29", hours:1, note:"Sarah · 1:30-2:30pm", invoiced:true },
+    // ---- Jun 2026 ----
+    { id:32, client:"glyphic", date:"2026-06-08", hours:1, note:"Josh · 7:00-8:00pm", invoiced:true },
+    { id:33, client:"glyphic", date:"2026-06-09", hours:0.75, note:"Scotty · 10:30-11:15am", invoiced:true },
+    { id:34, client:"glyphic", date:"2026-06-11", hours:1, note:"Andrew · 12:00-1:00pm", invoiced:true },
+    { id:35, client:"glyphic", date:"2026-06-18", hours:1, note:"Mary · 3:00-4:00pm", invoiced:true },
+    { id:36, client:"glyphic", date:"2026-06-22", hours:1, note:"Josh · 7:00-8:00pm", invoiced:true },
+    { id:37, client:"glyphic", date:"2026-06-24", hours:1, note:"Sarah · 5:00-6:00pm", invoiced:true },
+    { id:38, client:"glyphic", date:"2026-06-25", hours:1, note:"Andrew · 12:00-1:00pm", invoiced:true },
+    // ---- Jul 2026 ----
+    { id:39, client:"glyphic", date:"2026-07-01", hours:1, note:"Lee · 1:30-2:30pm", invoiced:true },
+    { id:40, client:"glyphic", date:"2026-07-02", hours:1, note:"Mary · 5:00-6:00pm", invoiced:true },
+    { id:41, client:"glyphic", date:"2026-07-02", hours:0.5, note:"Sarah · 6:30-7:00pm", invoiced:true },
+    { id:42, client:"glyphic", date:"2026-07-02", hours:1, note:"Josh · 7:00-8:00pm", invoiced:true },
+    { id:43, client:"glyphic", date:"2026-07-06", hours:1, note:"Sarah · 5:00-6:00pm", invoiced:true },
+    { id:44, client:"glyphic", date:"2026-07-15", hours:1, note:"Mary · 5:00-6:00pm", invoiced:true },
+    { id:45, client:"glyphic", date:"2026-07-20", hours:1, note:"Josh · 2:30-3:30pm", invoiced:true },
+    { id:46, client:"glyphic", date:"2026-07-20", hours:1, note:"Scotty · 3:30-4:30pm", invoiced:true },
+    { id:47, client:"glyphic", date:"2026-07-22", hours:1.25, note:"Sarah · 5:00-6:00pm (sheet lists 75 min)", invoiced:true },
+    { id:48, client:"glyphic", date:"2026-07-23", hours:1, note:"Andrew · 12:00-1:00pm", invoiced:true },
+    // ---- Aug 2026 ----
+    { id:49, client:"glyphic", date:"2026-08-03", hours:1, note:"Scotty · 3:30-4:30pm", invoiced:true },
+    { id:50, client:"glyphic", date:"2026-08-04", hours:1, note:"Sarah · 5:00-6:00pm", invoiced:true },
+    { id:51, client:"glyphic", date:"2026-08-04", hours:1, note:"Josh · 7:00-8:00pm", invoiced:true },
+    { id:52, client:"glyphic", date:"2026-08-06", hours:1, note:"Andrew · 12:00-1:00pm", invoiced:true },
+    { id:53, client:"glyphic", date:"2026-08-09", hours:1.25, note:"Josh · 2:00-3:15pm", invoiced:true },
+    { id:54, client:"glyphic", date:"2026-08-19", hours:1, note:"Scotty · 6:00-7:00pm", invoiced:true },
+    { id:55, client:"glyphic", date:"2026-08-26", hours:1, note:"Sarah · 5:00-6:00pm", invoiced:true },
+    { id:56, client:"glyphic", date:"2026-08-31", hours:1, note:"Scotty · 3:00-4:00pm", invoiced:true },
+
+    // ---- SGH-hr / SGH-admin: monthly totals only (no session-level sheet available) ----
+    { id:57, client:"sgh-hr", date:"2026-01-08", hours:5.5, note:"Jan monthly total (aggregate, not session-level — $1,925 ÷ $350/hr)", invoiced:true },
+    { id:58, client:"sgh-hr", date:"2026-03-03", hours:2, note:"Jan invoice, monthly total (aggregate — $700 ÷ $350/hr)", invoiced:true },
+    { id:59, client:"sgh-hr", date:"2026-06-01", hours:7.75, note:"Feb, Mar & Apr, monthly total (aggregate — $2,712.50 ÷ $350/hr)", invoiced:true },
+    { id:60, client:"sgh-hr", date:"2026-07-13", hours:2.5, note:"June, monthly total (aggregate — $875 ÷ $350/hr)", invoiced:true },
+    { id:61, client:"sgh-hr", date:"2026-08-24", hours:3, note:"July, monthly total (aggregate — $1,050 ÷ $350/hr)", invoiced:true },
+    { id:62, client:"sgh-admin", date:"2026-07-13", hours:2, note:"June, monthly total (aggregate — $700 ÷ $350/hr)", invoiced:true },
+    { id:63, client:"sgh-admin", date:"2026-09-01", hours:2, note:"July & Aug, monthly total (aggregate — $700 ÷ $350/hr)", invoiced:true },
   ],
 
-  // Annual revenue target and the running 2026 baseline from your invoicing sheet
-  // (payments already received this year, before this tracker started logging invoices individually)
+  // Annual revenue target. YTD Received is now built entirely from individually-logged
+  // invoices below (no baseline lump sum) — every real payment from the sheet is its own
+  // line item, so the app's own math produces the same totals as the sheet.
   revenueTarget: 120000,
-  ytdReceivedBaseline: 74081.50,
+  ytdReceivedBaseline: 0,
+
+  // Flat tax rate used for the quarterly estimate — matches the flat 20% your 2026 sheet uses.
+  taxRate: 20,
+
+  // Business info for generated invoice PDFs — starts empty on purpose. Fill in once via the
+  // "Business Info & Payment Details" form; it saves to your private database, never hardcoded
+  // in this file's public source (your repo is public for free GitHub Pages hosting).
+  businessInfo: { name:"", address:"", phone:"", email:"", ein:"", bankName:"", bankAccount:"", achRouting:"" },
+  nextInvoiceNumber: 1,
 
   // Invoice statuses: "pending" (known/expected, not yet sent) → "sent" (awaiting payment,
   // set overdue:true if it's gone stale) → "paid". Board renders these as three columns.
+  // Rebuilt Sept 3 to match the invoicing sheet exactly (Payments Received + Invoices Sent +
+  // Invoices Pending tables) — every real line item logged individually.
   invoices: [
-    { id:1, client:"radar", desc:"10-hr prepay coaching package (Jun batch, paid late)", amount:3750, status:"paid", sentDate:"2026-06-01", dueDate:"2026-06-15", kind:"fee" },
-    { id:2, client:"radar", desc:"10-hr prepay coaching package (Jul batch)", amount:3750, status:"paid", sentDate:"2026-07-13", dueDate:"2026-07-27", kind:"fee" },
-    { id:3, client:"lisa-s", desc:"Coaching session (Venmo)", amount:200, status:"paid", sentDate:"2026-08-18", dueDate:"2026-08-18", kind:"fee" },
-    { id:4, client:"sgh-admin", desc:"June 2026 invoice", amount:700, status:"paid", sentDate:"2026-07-13", dueDate:"2026-08-14", kind:"fee" },
-    { id:5, client:"sgh-hr", desc:"June 2026 invoice", amount:875, status:"paid", sentDate:"2026-07-13", dueDate:"2026-08-14", kind:"fee" },
-    { id:6, client:"glyphic", desc:"July 2026 invoice", amount:3246.75, status:"sent", sentDate:"2026-08-07", dueDate:"", kind:"fee" },
-    { id:7, client:"radar", desc:"10-hr prepay coaching package (Aug+ batch) — paid via ACH", amount:3750, status:"paid", sentDate:"2026-08-24", dueDate:"", kind:"fee" },
-    { id:8, client:"sgh-hr", desc:"July 2026 invoice", amount:1050, status:"sent", sentDate:"2026-08-25", dueDate:"", kind:"fee" },
-    { id:9, client:"lisa-c", desc:"Coaching session (Venmo)", amount:200, status:"paid", sentDate:"2026-08-27", dueDate:"2026-08-27", kind:"fee" },
-    { id:10, client:"glyphic", desc:"August 2026 invoice — 8.25 hrs, per real invoice PDF", amount:2747.25, status:"sent", sentDate:"2026-09-01", dueDate:"", kind:"fee" },
-    { id:11, client:"sgh-admin", desc:"Jul & Aug 2026 combined invoice — approved for payment 9/2", amount:"", status:"sent", sentDate:"2026-09-01", dueDate:"", kind:"fee" },
-    { id:12, client:"sakata", desc:"50% deposit — paid (amount is a $6,500 estimate, half of $13K project total — confirm actual figure)", amount:6500, status:"paid", sentDate:"2026-08-16", dueDate:"", kind:"fee" },
-    { id:13, client:"sakata", desc:"Final invoice + expenses (lumped per Fiona's Aug 25 agreement) — final balance $7,000.00 + expenses $2,578.78", amount:9578.78, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
+    // ---- Payments Received (28 items, sheet total $90,929.25) ----
+    { id:1, client:"radar", desc:"Prepay 10 hours July+", amount:3750, status:"paid", sentDate:"2026-07-13", dueDate:"", kind:"fee" },
+    { id:2, client:"sgh-hr", desc:"June hours", amount:875, status:"paid", sentDate:"2026-07-13", dueDate:"", kind:"fee" },
+    { id:3, client:"sgh-admin", desc:"June hours", amount:700, status:"paid", sentDate:"2026-07-13", dueDate:"", kind:"fee" },
+    { id:4, client:"glyphic", desc:"Jun coaching", amount:2247.75, status:"paid", sentDate:"2026-07-06", dueDate:"", kind:"fee" },
+    { id:5, client:"sgh-admin", desc:"Feb, Mar & Apr", amount:2975, status:"paid", sentDate:"2026-06-01", dueDate:"", kind:"fee" },
+    { id:6, client:"radar", desc:"Prepay 10 hours May+ (reminded 7/13)", amount:3750, status:"paid", sentDate:"2026-06-01", dueDate:"", kind:"fee" },
+    { id:7, client:"sgh-hr", desc:"Feb, Mar & Apr", amount:2712.50, status:"paid", sentDate:"2026-06-01", dueDate:"", kind:"fee" },
+    { id:8, client:"glyphic", desc:"May invoice", amount:1942.50, status:"paid", sentDate:"2026-06-01", dueDate:"", kind:"fee" },
+    { id:9, client:"nova", desc:"3-day June VC", amount:3000, status:"paid", sentDate:"2026-06-01", dueDate:"", kind:"fee" },
+    { id:10, client:"glyphic", desc:"Apr invoice", amount:2497.50, status:"paid", sentDate:"2026-05-05", dueDate:"", kind:"fee" },
+    { id:11, client:"fundomo", desc:"Pre-pay next 20 hours", amount:7500, status:"paid", sentDate:"2026-04-13", dueDate:"", kind:"fee" },
+    { id:12, client:"nova", desc:"EA Ignite & travel $570 stipend", amount:3570, status:"paid", sentDate:"2026-04-13", dueDate:"", kind:"fee" },
+    { id:13, client:"glyphic", desc:"Mar invoice", amount:1914.75, status:"paid", sentDate:"2026-04-07", dueDate:"", kind:"fee" },
+    { id:14, client:"generate", desc:"Pre-pay next 20 hours", amount:7500, status:"paid", sentDate:"2026-04-13", dueDate:"", kind:"fee" },
+    { id:15, client:"sgh-admin", desc:"Dec & Jan invoice", amount:1050, status:"paid", sentDate:"2026-03-03", dueDate:"", kind:"fee" },
+    { id:16, client:"nova", desc:"Feb 3-day virtual & TNT", amount:4667, status:"paid", sentDate:"2026-03-03", dueDate:"", kind:"fee" },
+    { id:17, client:"sgh-hr", desc:"Jan invoice", amount:700, status:"paid", sentDate:"2026-03-03", dueDate:"", kind:"fee" },
+    { id:18, client:"glyphic", desc:"Jan & Feb invoice", amount:3080.25, status:"paid", sentDate:"2026-03-03", dueDate:"", kind:"fee" },
+    { id:19, client:"sgh-hr", desc:"Oct 2025 Coaching", amount:2450, status:"paid", sentDate:"2025-11-18", dueDate:"", kind:"fee" },
+    { id:20, client:"nova", desc:"Feb flat fee", amount:1667, status:"paid", sentDate:"2026-02-01", dueDate:"", kind:"fee" },
+    { id:21, client:"sgh-hr", desc:"Nov & Dec 2025", amount:1925, status:"paid", sentDate:"2026-01-08", dueDate:"", kind:"fee" },
+    { id:22, client:"nova", desc:"Jan flat fee — training", amount:1817, status:"paid", sentDate:"2026-01-01", dueDate:"", kind:"fee" },
+    { id:23, client:"brittany", desc:"Pre-pay 10 hrs", amount:3500, status:"paid", sentDate:"2026-01-06", dueDate:"", kind:"fee" },
+    { id:24, client:"generate", desc:"Pre-pay 20 hrs", amount:7500, status:"paid", sentDate:"2026-01-07", dueDate:"", kind:"fee" },
+    { id:25, client:null, desc:"Turbocam / Jenn — Jan>Mar quarterly (not in current roster)", amount:2392, status:"paid", sentDate:"2026-01-06", dueDate:"", kind:"fee" },
+    { id:26, client:"fundomo", desc:"Pre-pay 20 hrs", amount:7500, status:"paid", sentDate:"2026-01-06", dueDate:"", kind:"fee" },
+    { id:27, client:"glyphic", desc:"Nov & Dec 2025", amount:3996, status:"paid", sentDate:"2026-01-07", dueDate:"", kind:"fee" },
+    { id:28, client:"radar", desc:"Pre-pay 10 hrs", amount:3750, status:"paid", sentDate:"2026-01-06", dueDate:"", kind:"fee" },
+
+    // ---- Invoices Sent (5 items, sheet total $11,494.00) ----
+    { id:29, client:"glyphic", desc:"Aug hours", amount:2747.25, status:"sent", sentDate:"2026-09-01", dueDate:"", kind:"fee" },
+    { id:30, client:"sgh-admin", desc:"July & Aug hours", amount:700, status:"sent", sentDate:"2026-09-01", dueDate:"", kind:"fee" },
+    { id:31, client:"sgh-hr", desc:"July hours", amount:1050, status:"sent", sentDate:"2026-08-24", dueDate:"", kind:"fee" },
+    { id:32, client:"radar", desc:"Prepay 10 hours Aug+ — sheet shows Sent; you separately told me it cleared via ACH 8/28, but reverted this to match the sheet exactly per your request", amount:3750, status:"sent", sentDate:"2026-08-24", dueDate:"", kind:"fee" },
+    { id:33, client:"glyphic", desc:"July hours", amount:3246.75, status:"sent", sentDate:"2026-08-07", dueDate:"", kind:"fee" },
+
+    // ---- Invoices Pending (15 items, sheet total $40,100.00) ----
+    { id:34, client:"nova", desc:"EA Ignite 3-day in-person (Dec)", amount:6000, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
+    { id:35, client:"sgh-admin", desc:"Dec (projected)", amount:1000, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
+    { id:36, client:"sgh-hr", desc:"Dec (projected)", amount:700, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
+    { id:37, client:"glyphic", desc:"Dec (projected)", amount:3000, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
+    { id:38, client:"nova", desc:"Oct 3-day virtual (Nov invoice)", amount:3000, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
+    { id:39, client:"sgh-admin", desc:"Nov (projected)", amount:1000, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
+    { id:40, client:"sgh-hr", desc:"Nov (projected)", amount:700, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
+    { id:41, client:"glyphic", desc:"Nov (projected)", amount:3000, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
+    { id:42, client:"sgh-admin", desc:"Oct (projected)", amount:1000, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
+    { id:43, client:"sgh-hr", desc:"Oct (projected)", amount:700, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
+    { id:44, client:"glyphic", desc:"Oct (projected)", amount:3000, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
+    { id:45, client:"generate", desc:"Pre-pay next 20 hours (Oct)", amount:7500, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
+    { id:46, client:"nova", desc:"Sept — $6K teaching + $2K expenses (expenses not revenue, kept as one line to match sheet total)", amount:8000, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
+    { id:47, client:"sgh-hr", desc:"Aug hours (Sept invoice)", amount:700, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
+    { id:48, client:"nova", desc:"Course updates June (4) & July (TBD)", amount:800, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
+
+    // ---- Self-pay (Venmo, excluded from revenue/tax — tracked in Self-Pay dashboard) ----
+    { id:49, client:"lisa-s", desc:"Coaching session (Venmo)", amount:200, status:"paid", sentDate:"2026-08-18", dueDate:"", kind:"fee" },
+    { id:50, client:"lisa-c", desc:"Coaching session (Venmo)", amount:200, status:"paid", sentDate:"2026-08-27", dueDate:"", kind:"fee" },
+
+    // ---- Carve AI - Sakata (separate from the Invoices Pending table above, tracked elsewhere on the sheet) ----
+    { id:51, client:"sakata", desc:"50% deposit — paid (amount is a $6,500 estimate, half of $13K project total — confirm actual figure)", amount:6500, status:"paid", sentDate:"2026-08-16", dueDate:"", kind:"fee" },
+    { id:52, client:"sakata", desc:"Final invoice + expenses (lumped per Fiona's Aug 25 agreement) — final balance $7,000.00 + expenses $2,578.78", amount:9578.78, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
   ],
 
   // Standing rule (added per user request): when scanning email for a refresh, actively
@@ -1427,6 +1628,11 @@ function loadIntoState(obj){
   STATE.billingTerms = obj.billingTerms || {};
   STATE.hoursLog = obj.hoursLog || [];
   STATE.invoices = obj.invoices || [];
+  STATE.revenueTarget = (obj.revenueTarget !== undefined && obj.revenueTarget !== null) ? obj.revenueTarget : STATE.revenueTarget;
+  STATE.ytdReceivedBaseline = (obj.ytdReceivedBaseline !== undefined && obj.ytdReceivedBaseline !== null) ? obj.ytdReceivedBaseline : STATE.ytdReceivedBaseline;
+  STATE.taxRate = (obj.taxRate !== undefined && obj.taxRate !== null) ? obj.taxRate : STATE.taxRate;
+  STATE.businessInfo = obj.businessInfo || STATE.businessInfo;
+  STATE.nextInvoiceNumber = (obj.nextInvoiceNumber !== undefined && obj.nextInvoiceNumber !== null) ? obj.nextInvoiceNumber : STATE.nextInvoiceNumber;
 
   // One-time migration for data saved before the Invoice Board redesign:
   // old "draft" status → "pending"; old "overdue" status → "sent" + overdue:true;
@@ -1649,7 +1855,7 @@ document.getElementById("saveLogCallBtn").addEventListener("click", ()=>{
     hours, note: textInput.value.trim() || "Logged call", invoiced:false
   });
   markDirty();
-  renderHoursLog();
+  renderMonthlySummary();
   renderReceivablesSummary();
   closeLogCallModal();
 });
@@ -1864,7 +2070,8 @@ function renderServiceSnapshot(){
 function formatTerms(bt){
   if(!bt || !bt.type) return { text:"Not set — click Edit to define pay terms", unset:true };
   if(bt.type === "hourly"){
-    return { text: bt.hourlyRate ? `Hourly · $${bt.hourlyRate}/hr` : "Hourly · rate not set", unset:!bt.hourlyRate };
+    const selfPayNote = bt.selfPay ? " · self-pay, no invoicing" : "";
+    return { text: bt.hourlyRate ? `Hourly · $${bt.hourlyRate}/hr${selfPayNote}` : "Hourly · rate not set", unset:!bt.hourlyRate };
   }
   if(bt.type === "project"){
     const parts = [];
@@ -1876,7 +2083,8 @@ function formatTerms(bt){
     if(!bt.prepayHours || !bt.prepayRate) return { text:"Prepay · package not set", unset:true };
     const remaining = bt.prepayHours - (bt.prepayHoursUsed || 0);
     const total = bt.prepayHours * bt.prepayRate;
-    return { text: `Prepay · ${bt.prepayHours} hrs @ $${bt.prepayRate}/hr ($${total.toLocaleString()}/package) · ${remaining} hrs remaining`, unset:false, remaining };
+    const selfPayNote = bt.selfPay ? " · self-pay, no invoicing" : "";
+    return { text: `Prepay · ${bt.prepayHours} hrs @ $${bt.prepayRate}/hr ($${total.toLocaleString()}/package) · ${remaining} hrs remaining${selfPayNote}`, unset:false, remaining };
   }
   return { text:"Not set", unset:true };
 }
@@ -1901,6 +2109,9 @@ function renderBillingForm(clientId, bt){
 
     <span class="bt-field-label bt-f-hourly" style="display:${type==="hourly"?"inline":"none"}">Rate $/hr</span>
     <input type="number" class="bt-f-hourly bt-hourlyRate" style="display:${type==="hourly"?"inline-block":"none"}" value="${bt.hourlyRate||""}" min="0">
+    <label class="bt-field-label bt-f-hourly" style="display:${type==="hourly"?"inline-flex":"none"}; align-items:center; gap:5px; font-weight:600;">
+      <input type="checkbox" class="bt-selfPay" ${bt.selfPay?"checked":""}> Self-pay, no invoicing (e.g. Venmo)
+    </label>
 
     <span class="bt-field-label bt-f-project" style="display:${type==="project"?"inline":"none"}">Total $</span>
     <input type="number" class="bt-f-project bt-projectTotal" style="display:${type==="project"?"inline-block":"none"}" value="${bt.projectTotal||""}" min="0">
@@ -1913,6 +2124,9 @@ function renderBillingForm(clientId, bt){
     <input type="number" class="bt-f-prepay bt-prepayRate" style="display:${type==="prepay"?"inline-block":"none"}" value="${bt.prepayRate||""}" min="0">
     <span class="bt-field-label bt-f-prepay" style="display:${type==="prepay"?"inline":"none"}">Hours used</span>
     <input type="number" class="bt-f-prepay bt-prepayHoursUsed" style="display:${type==="prepay"?"inline-block":"none"}" value="${bt.prepayHoursUsed||0}" min="0">
+    <label class="bt-field-label bt-f-prepay" style="display:${type==="prepay"?"inline-flex":"none"}; align-items:center; gap:5px; font-weight:600;">
+      <input type="checkbox" class="bt-selfPayPrepay" ${bt.selfPay?"checked":""}> Self-pay, no invoicing (e.g. Venmo)
+    </label>
 
     <button class="bt-save" data-action="save-bt" data-id="${clientId}">Save</button>
   </div>`;
@@ -1949,6 +2163,7 @@ function renderInvoiceBoard(){
       return `<div class="board-card ${inv.overdue ? "overdue" : ""}">
         <div class="bc-client">${c ? c.name : "—"} ${isReimb ? `<span class="kind-badge">Reimb.</span>` : ""}</div>
         <div class="bc-desc">${inv.desc}</div>
+        ${inv.invoiceNumber ? `<div class="bc-inv-number">Invoice #${inv.invoiceNumber}</div>` : ""}
         <div class="bc-bottom">
           <span class="bc-amount">${inv.amount !== "" && inv.amount != null ? "$"+Number(inv.amount).toLocaleString() : "amount not set"}</span>
           <span class="bc-date">${inv.sentDate ? fmtDate(inv.sentDate) : ""}</span>
@@ -1957,6 +2172,7 @@ function renderInvoiceBoard(){
           ${status === "pending" ? `<button class="mini-btn" data-action="mark-sent" data-id="${inv.id}">Mark sent</button>` : ""}
           ${status === "sent" ? `<button class="mini-btn" data-action="mark-paid" data-id="${inv.id}">Mark paid</button>` : ""}
           ${status === "sent" ? `<button class="mini-btn" data-action="toggle-overdue" data-id="${inv.id}">${inv.overdue ? "Unflag overdue" : "Flag overdue"}</button>` : ""}
+          ${!isReimb ? `<button class="mini-btn primary" data-action="generate-pdf" data-id="${inv.id}">${inv.invoiceNumber ? "Re-download PDF" : "Generate PDF"}</button>` : ""}
           <button class="mini-btn" data-action="delete-invoice" data-id="${inv.id}">Delete</button>
         </div>
       </div>`;
@@ -1966,16 +2182,157 @@ function renderInvoiceBoard(){
 
 
 /* ---------- Receivables Summary ---------- */
+function isSelfPay(clientId){
+  const bt = STATE.billingTerms[clientId];
+  return !!(bt && bt.selfPay);
+}
+// True for self-pay (Venmo, no invoicing) AND for anything else flagged as tracked in a
+// separate part of the sheet (e.g. Carve AI - Sakata, which is invoiced formally but lives
+// in a different section than the Payments Received / Sent / Pending tables this dashboard
+// mirrors) — either way, excluded from the main revenue and tax totals.
+function isExcludedFromRevenue(clientId){
+  const bt = STATE.billingTerms[clientId];
+  return !!(bt && (bt.selfPay || bt.excludeFromRevenue));
+}
+
+/* ---------- Business Info (invoice PDF letterhead + payment details) ---------- */
+function renderBusinessInfo(){
+  const b = STATE.businessInfo || {};
+  document.getElementById("bizName").value = b.name || "";
+  document.getElementById("bizAddress").value = b.address || "";
+  document.getElementById("bizPhone").value = b.phone || "";
+  document.getElementById("bizEmail").value = b.email || "";
+  document.getElementById("bizEin").value = b.ein || "";
+  document.getElementById("bizBankName").value = b.bankName || "";
+  document.getElementById("bizBankAccount").value = b.bankAccount || "";
+  document.getElementById("bizAchRouting").value = b.achRouting || "";
+}
+
+/* ---------- Invoice PDF generation (client-side, via jsPDF — no server involved) ---------- */
+function generateInvoicePDF(invoiceId){
+  const inv = STATE.invoices.find(i => i.id === invoiceId);
+  if(!inv) return;
+  const c = clientById(inv.client);
+  const biz = STATE.businessInfo || {};
+
+  if(!biz.name){
+    alert('Add your business name (at least) in "Business Info & Payment Details" above before generating a PDF.');
+    return;
+  }
+
+  // Assign a stable invoice number the first time this invoice is generated — re-downloading
+  // later reuses the same number rather than incrementing again.
+  if(!inv.invoiceNumber){
+    const year = new Date().getFullYear();
+    inv.invoiceNumber = `${year}-${String(STATE.nextInvoiceNumber).padStart(4,"0")}`;
+    STATE.nextInvoiceNumber++;
+    markDirty();
+  }
+
+  // Reverse-engineer qty/rate from the client's hourly rate when possible, matching the
+  // Description/Qty/Unit Price/Total layout of your existing invoice template.
+  const bt = STATE.billingTerms[inv.client];
+  let qty = 1, unitPrice = Number(inv.amount) || 0, description = inv.desc;
+  if(bt && bt.type === "hourly" && bt.hourlyRate){
+    qty = Math.round((Number(inv.amount) / bt.hourlyRate) * 100) / 100;
+    unitPrice = bt.hourlyRate;
+    description = "Coaching";
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:"pt", format:"letter" });
+  const pageW = doc.internal.pageSize.getWidth();
+  let y = 50;
+
+  doc.setFillColor(211,224,240);
+  doc.rect(40, y, pageW-80, 30, "F");
+  doc.setFont("helvetica","bold"); doc.setFontSize(14);
+  doc.setTextColor(20,20,20);
+  doc.text(biz.name, pageW/2, y+20, { align:"center" });
+  y += 40;
+
+  doc.setFont("helvetica","normal"); doc.setFontSize(9);
+  const contactLine = [biz.address, biz.phone ? "Tel: "+biz.phone : "", biz.email].filter(Boolean).join("     ");
+  doc.text(contactLine, 45, y);
+  y += 20;
+
+  doc.setFont("helvetica","bold"); doc.setFontSize(10);
+  doc.text(`DATE: ${new Date().toLocaleDateString("en-US")}`, 45, y);
+  doc.text(`INVOICE NO: ${inv.invoiceNumber}`, pageW-45, y, { align:"right" });
+  y += 22;
+
+  doc.setFont("helvetica","normal");
+  doc.text(`Attn: ${c ? c.name : ""}`, 45, y);
+  y += 25;
+
+  // Line item table
+  doc.setFillColor(211,224,240);
+  doc.rect(40, y, pageW-80, 20, "F");
+  doc.setFont("helvetica","bold"); doc.setFontSize(9);
+  doc.text("DESCRIPTION", 48, y+14);
+  doc.text("QTY", pageW-230, y+14);
+  doc.text("UNIT PRICE", pageW-165, y+14);
+  doc.text("TOTAL", pageW-60, y+14, { align:"right" });
+  y += 20;
+
+  doc.setDrawColor(200,200,200);
+  doc.line(40, y, pageW-40, y);
+  y += 16;
+  doc.setFont("helvetica","normal");
+  doc.text(description, 48, y);
+  doc.text(String(qty), pageW-230, y);
+  doc.text(unitPrice.toFixed(2), pageW-165, y);
+  doc.text(Number(inv.amount).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}), pageW-60, y, { align:"right" });
+  y += 20;
+  doc.line(40, y, pageW-40, y);
+  y += 18;
+
+  doc.setFont("helvetica","bold");
+  doc.text("$ " + Number(inv.amount).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}), pageW-60, y, { align:"right" });
+  y += 40;
+
+  // Payment options — only show sections you've actually filled in
+  doc.setFont("helvetica","bold"); doc.setFontSize(10);
+  doc.text("PAYMENT OPTIONS", 45, y); y += 16;
+
+  if(biz.address){
+    doc.setFont("helvetica","bold"); doc.setFontSize(9);
+    doc.text("CHECK", 45, y); y += 13;
+    doc.setFont("helvetica","normal");
+    doc.text(`- Payable to: ${biz.name}`, 50, y); y += 13;
+    doc.text(`- Mail to: ${biz.address}`, 50, y); y += 18;
+  }
+  if(biz.bankName || biz.bankAccount || biz.achRouting){
+    doc.setFont("helvetica","bold"); doc.setFontSize(9);
+    doc.text("ACH", 45, y); y += 13;
+    doc.setFont("helvetica","normal");
+    if(biz.bankName){ doc.text(`- Bank: ${biz.bankName}`, 50, y); y += 13; }
+    if(biz.bankAccount){ doc.text(`- Account: ${biz.bankAccount}`, 50, y); y += 13; }
+    if(biz.achRouting){ doc.text(`- ACH routing: ${biz.achRouting}`, 50, y); y += 13; }
+    y += 5;
+  }
+  if(biz.ein){
+    doc.setFont("helvetica","bold"); doc.setFontSize(9);
+    doc.text(`EIN: ${biz.ein}`, 45, y);
+  }
+
+  const fileName = `Invoice_${c ? c.name.replace(/[^a-z0-9]/gi,"") : "client"}_${inv.invoiceNumber}.pdf`;
+  doc.save(fileName);
+  renderInvoiceBoard();
+}
+
 function renderReceivablesSummary(){
   const el = document.getElementById("receivablesStrip");
-  const feeInvoices = STATE.invoices.filter(i => i.kind !== "reimbursement" && i.amount !== "" && i.amount != null);
+  // Self-pay/Venmo clients (no formal invoicing) are excluded entirely from revenue and tax
+  // math per user instruction — they're tracked separately in the Self-Pay mini dashboard.
+  const feeInvoices = STATE.invoices.filter(i => i.kind !== "reimbursement" && i.amount !== "" && i.amount != null && !isExcludedFromRevenue(i.client));
 
   const outstanding = feeInvoices.filter(i => i.status === "sent")
     .reduce((s,i) => s + Number(i.amount), 0);
 
   const pendingFromHours = STATE.clients.reduce((s,c) => {
     const bt = STATE.billingTerms[c.id];
-    if(bt && bt.type === "hourly" && bt.hourlyRate){
+    if(bt && bt.type === "hourly" && bt.hourlyRate && !isExcludedFromRevenue(c.id)){
       return s + uninvoicedHours(c.id) * bt.hourlyRate;
     }
     return s;
@@ -1983,8 +2340,10 @@ function renderReceivablesSummary(){
   const pendingFromBoard = feeInvoices.filter(i => i.status === "pending").reduce((s,i) => s + Number(i.amount), 0);
   const pending = pendingFromHours + pendingFromBoard;
 
-  const thisYear = new Date().getFullYear().toString();
-  const ytdFromTracker = feeInvoices.filter(i => i.status === "paid" && (i.sentDate||"").startsWith(thisYear))
+  // No year filter here — every "paid" invoice in the array is something you've explicitly
+  // logged as a real 2026 payment (your sheet itself includes one Nov-2025-dated line in its
+  // "2026 Payments Received" total, so a strict date filter would under-count vs. the sheet).
+  const ytdFromTracker = feeInvoices.filter(i => i.status === "paid")
     .reduce((s,i) => s + Number(i.amount), 0);
   const ytdReceived = (STATE.ytdReceivedBaseline || 0) + ytdFromTracker;
 
@@ -2001,6 +2360,63 @@ function renderReceivablesSummary(){
     `$${ytdReceived.toLocaleString(undefined,{maximumFractionDigits:0})} of $${target.toLocaleString(undefined,{maximumFractionDigits:0})} (${pct}%)`;
   document.getElementById("targetProgressFill").style.width = pct + "%";
   document.getElementById("revenueTargetInput").value = target;
+
+  renderTaxEstimate(pending, outstanding, ytdReceived);
+  renderSelfPayDashboard();
+}
+
+/* ---------- Estimated Quarterly Taxes ---------- */
+function renderTaxEstimate(pending, outstanding, ytdReceived){
+  const rate = STATE.taxRate || 0;
+  // Matches the sheet's own formula exactly: Earned & Estimated = YTD Received + Pending
+  // (Outstanding/Sent is NOT included in the sheet's tax base — confirmed by reproducing
+  // its numbers exactly: 20% × $131,029.25 = $26,205.85).
+  const base = pending + ytdReceived;
+  const totalTax = base * (rate / 100);
+  const quarterly = totalTax / 4;
+
+  document.getElementById("taxRateInput").value = rate;
+  document.getElementById("taxBaseText").textContent =
+    `On $${base.toLocaleString(undefined,{maximumFractionDigits:0})} (Pending + YTD Received — matches your sheet's "Earned & Estimated") → $${totalTax.toLocaleString(undefined,{maximumFractionDigits:0})} estimated total tax`;
+
+  document.getElementById("taxQuarters").innerHTML = ["Q1","Q2","Q3","Q4"].map(q => `
+    <div class="tax-q-tile">
+      <div class="lbl">${q}</div>
+      <div class="val">$${quarterly.toLocaleString(undefined,{maximumFractionDigits:0})}</div>
+    </div>`).join("");
+}
+
+/* ---------- Self-Pay Dashboard (excluded from revenue/tax above) ---------- */
+function renderSelfPayDashboard(){
+  const el = document.getElementById("selfPayDashboard");
+  const thisYear = new Date().getFullYear().toString();
+  const excludedClients = STATE.clients.filter(c => isExcludedFromRevenue(c.id));
+
+  if(excludedClients.length === 0){
+    el.innerHTML = `<div class="empty-state">Nothing excluded yet — check "Self-pay, no invoicing" on a client's billing terms in the Roster below.</div>`;
+    return;
+  }
+
+  let grandTotal = 0;
+  const tiles = excludedClients.map(c => {
+    const bt = STATE.billingTerms[c.id];
+    const reason = bt.selfPay ? "Self-pay" : "Tracked separately";
+    const ytd = STATE.invoices
+      .filter(i => i.client === c.id && i.kind !== "reimbursement" && i.status === "paid" && (i.sentDate||"").startsWith(thisYear))
+      .reduce((s,i) => s + (Number(i.amount) || 0), 0);
+    grandTotal += ytd;
+    return `<div class="selfpay-tile">
+      <div class="lbl">${c.name} <span style="font-weight:400;">(${reason})</span></div>
+      <div class="val">$${ytd.toLocaleString(undefined,{maximumFractionDigits:0})}</div>
+    </div>`;
+  }).join("");
+
+  el.innerHTML = `<div class="selfpay-strip">${tiles}
+    <div class="selfpay-tile total">
+      <div class="lbl">Total YTD (excluded from revenue above)</div>
+      <div class="val">$${grandTotal.toLocaleString(undefined,{maximumFractionDigits:0})}</div>
+    </div>
+  </div>`;
 }
 
 /* ---------- Monthly Invoicing Checklist ---------- */
@@ -2011,7 +2427,7 @@ function renderInvoiceChecklist(){
 
   const recurring = STATE.clients.filter(c => {
     const bt = STATE.billingTerms[c.id];
-    return bt && (bt.type === "hourly" || bt.type === "project");
+    return bt && (bt.type === "hourly" || bt.type === "project") && !bt.selfPay;
   });
 
   const needsInvoice = recurring.map(c => {
@@ -2038,39 +2454,18 @@ function renderInvoiceChecklist(){
 }
 
 /* ---------- Hours Log ---------- */
-function renderHoursLog(){
-  const el = document.getElementById("hoursLogList");
-  const sorted = [...STATE.hoursLog].sort((a,b) => (b.date||"").localeCompare(a.date||""));
-  if(sorted.length === 0){ el.innerHTML = `<div class="empty-state">No hours logged yet.</div>`; return; }
-  el.innerHTML = sorted.map(h => {
-    const c = clientById(h.client);
-    const status = h.status || "Complete";
-    return `<div class="hl-row ${h.invoiced ? "invoiced":""}">
-      <div class="hl-date">${fmtDate(h.date)}</div>
-      <div class="hl-client">${c ? c.name : "—"}</div>
-      <div class="hl-hours">${h.hours} hr${h.hours===1?"":"s"}</div>
-      <div class="hl-note">${h.note||""} ${status==="No-show" ? `<span class="kind-badge">No-show</span>` : ""}</div>
-      <label class="hl-check">
-        <input type="checkbox" data-action="toggle-hl-invoiced" data-id="${h.id}" ${h.invoiced?"checked":""}>
-        Invoiced
-      </label>
-      <button class="icon-btn" data-action="toggle-hl-status" data-id="${h.id}" title="Toggle No-show">${status==="No-show"?"↺":"⊘"}</button>
-      <button class="icon-btn" data-action="delete-hl" data-id="${h.id}" title="Delete">✕</button>
-    </div>`;
-  }).join("");
-}
 
 function renderMonthlySummary(){
   const clientSel = document.getElementById("summaryClientSelect");
+  const monthSel = document.getElementById("summaryMonthSelect");
   const el = document.getElementById("monthlySummaryList");
   const clientId = clientSel.value;
-  if(!clientId){ el.innerHTML = `<div class="empty-state">Pick a client above.</div>`; return; }
+  if(!clientId){ el.innerHTML = `<div class="empty-state">Pick a client above.</div>`; monthSel.innerHTML = `<option value="">All months</option>`; return; }
 
   const bt = STATE.billingTerms[clientId];
   const rate = bt && bt.hourlyRate ? bt.hourlyRate : (bt && bt.prepayRate ? bt.prepayRate : null);
 
   const entries = STATE.hoursLog.filter(h => h.client === clientId).sort((a,b) => (a.date||"").localeCompare(b.date||""));
-  if(entries.length === 0){ el.innerHTML = `<div class="empty-state">No sessions logged for this client yet.</div>`; return; }
 
   const byMonth = {};
   entries.forEach(h => {
@@ -2078,10 +2473,62 @@ function renderMonthlySummary(){
     (byMonth[key] = byMonth[key] || []).push(h);
   });
 
-  el.innerHTML = Object.keys(byMonth).sort().map(monthKey => {
-    const rows = byMonth[monthKey];
+  // Dropdown always offers the full current year (Jan-Dec), regardless of which months
+  // actually have logged sessions — picking an empty month just shows "no sessions yet"
+  // rather than being unselectable. From November onward, next year's 12 months are added
+  // too, so year-end planning doesn't need to wait for January 1st. This is computed fresh
+  // from the real date on every render, so it advances on its own — nothing to maintain.
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const dropdownKeys = [];
+  for(let m=0; m<12; m++){ dropdownKeys.push(`${currentYear}-${String(m+1).padStart(2,"0")}`); }
+  if(now.getMonth() >= 10){ // November (0-indexed 10) or December
+    for(let m=0; m<12; m++){ dropdownKeys.push(`${currentYear+1}-${String(m+1).padStart(2,"0")}`); }
+  }
+
+  const prevMonthVal = monthSel.value;
+  monthSel.innerHTML = `<option value="">All months</option>` + dropdownKeys.map(k => {
+    const label = new Date(k + "-01T00:00:00").toLocaleDateString("en-US", {month:"long", year:"numeric"});
+    return `<option value="${k}">${label}</option>`;
+  }).join("");
+  if(dropdownKeys.includes(prevMonthVal)) monthSel.value = prevMonthVal;
+  const filterMonth = monthSel.value;
+
+  if(entries.length === 0 && !filterMonth){ el.innerHTML = `<div class="empty-state">No sessions logged for this client yet.</div>`; return; }
+
+  // YTD banner — current calendar year, regardless of which month is being viewed below
+  const thisYear = new Date().getFullYear().toString();
+  let ytdHours = 0, ytdFee = 0;
+  entries.forEach(h => {
+    if((h.date||"").startsWith(thisYear) && (h.status||"Complete") !== "No-show"){
+      ytdHours += h.hours;
+      if(rate) ytdFee += h.hours * rate;
+    }
+  });
+  const ytdBanner = `<div class="summary-ytd">
+    <span>YTD ${thisYear}</span>
+    <span>${ytdHours.toLocaleString(undefined,{maximumFractionDigits:2})} hrs</span>
+    <span>${rate ? "$"+ytdFee.toLocaleString(undefined,{maximumFractionDigits:2}) : "—"}</span>
+  </div>`;
+
+  const populatedMonthKeys = Object.keys(byMonth).sort();
+  const keysToShow = filterMonth ? [filterMonth] : populatedMonthKeys;
+
+  if(keysToShow.length === 0){
+    el.innerHTML = ytdBanner + `<div class="empty-state">No sessions logged for this client yet.</div>`;
+    return;
+  }
+
+  el.innerHTML = ytdBanner + keysToShow.map(monthKey => {
+    const rows = byMonth[monthKey] || [];
     const monthLabel = monthKey === "undated" ? "Undated" :
       new Date(monthKey + "-01T00:00:00").toLocaleDateString("en-US", {month:"long", year:"numeric"});
+    if(rows.length === 0){
+      return `<div class="summary-month">
+        <div class="summary-month-head"><span>${monthLabel}</span></div>
+        <div class="empty-state">No sessions logged yet.</div>
+      </div>`;
+    }
     let monthHours = 0, monthFee = 0;
     const rowsHtml = rows.map(h => {
       const status = h.status || "Complete";
@@ -2094,6 +2541,7 @@ function renderMonthlySummary(){
         <div class="sr-hours">${h.hours}h</div>
         <div class="sr-fee">${rate ? "$"+fee.toLocaleString(undefined,{maximumFractionDigits:2}) : "—"}</div>
         <div>${status}</div>
+        <button class="icon-btn" data-action="delete-summary-row" data-id="${h.id}" title="Delete this session">✕</button>
       </div>`;
     }).join("");
     return `<div class="summary-month">
@@ -2222,10 +2670,10 @@ function renderAll(){
   renderBucketTabs();
   renderLookAhead();
   renderServiceSnapshot();
+  renderBusinessInfo();
   renderInvoiceBoard();
   renderReceivablesSummary();
   renderInvoiceChecklist();
-  renderHoursLog();
   renderMonthlySummary();
   renderContacts();
   renderClientRoster();
@@ -2394,6 +2842,7 @@ document.getElementById("clientRosterList").addEventListener("click", (e)=>{
     const bt = { type: type || null };
     if(type === "hourly"){
       bt.hourlyRate = Number(form.querySelector(".bt-hourlyRate").value) || null;
+      bt.selfPay = form.querySelector(".bt-selfPay").checked;
     } else if(type === "project"){
       bt.projectTotal = Number(form.querySelector(".bt-projectTotal").value) || null;
       bt.projectRate = Number(form.querySelector(".bt-projectRate").value) || null;
@@ -2401,6 +2850,7 @@ document.getElementById("clientRosterList").addEventListener("click", (e)=>{
       bt.prepayHours = Number(form.querySelector(".bt-prepayHours").value) || null;
       bt.prepayRate = Number(form.querySelector(".bt-prepayRate").value) || null;
       bt.prepayHoursUsed = Number(form.querySelector(".bt-prepayHoursUsed").value) || 0;
+      bt.selfPay = form.querySelector(".bt-selfPayPrepay").checked;
     }
     STATE.billingTerms[id] = bt;
     openBillingEditId = null;
@@ -2428,6 +2878,22 @@ document.getElementById("invoiceBoard").addEventListener("click", (e)=>{
   if(target.dataset.action === "mark-sent" && inv){ inv.status = "sent"; inv.sentDate = inv.sentDate || new Date().toISOString().slice(0,10); markDirty(); renderInvoiceBoard(); renderReceivablesSummary(); renderInvoiceChecklist(); }
   if(target.dataset.action === "toggle-overdue" && inv){ inv.overdue = !inv.overdue; markDirty(); renderInvoiceBoard(); }
   if(target.dataset.action === "delete-invoice"){ STATE.invoices = STATE.invoices.filter(x=>x.id!==id); markDirty(); renderInvoiceBoard(); renderReceivablesSummary(); renderInvoiceChecklist(); }
+  if(target.dataset.action === "generate-pdf"){ generateInvoicePDF(id); }
+});
+
+document.getElementById("saveBizInfoBtn").addEventListener("click", ()=>{
+  STATE.businessInfo = {
+    name: document.getElementById("bizName").value.trim(),
+    address: document.getElementById("bizAddress").value.trim(),
+    phone: document.getElementById("bizPhone").value.trim(),
+    email: document.getElementById("bizEmail").value.trim(),
+    ein: document.getElementById("bizEin").value.trim(),
+    bankName: document.getElementById("bizBankName").value.trim(),
+    bankAccount: document.getElementById("bizBankAccount").value.trim(),
+    achRouting: document.getElementById("bizAchRouting").value.trim(),
+  };
+  markDirty();
+  alert("Saved.");
 });
 
 document.querySelectorAll("#invoiceBoard .board-col-head").forEach(head => {
@@ -2474,29 +2940,18 @@ document.getElementById("revenueTargetInput").addEventListener("change", (e)=>{
   markDirty(); renderReceivablesSummary();
 });
 
-/* ---- Hours Log events ---- */
-document.getElementById("hoursLogList").addEventListener("change", (e)=>{
-  const cb = e.target.closest("[data-action='toggle-hl-invoiced']");
-  if(!cb) return;
-  const id = Number(cb.dataset.id);
-  const h = STATE.hoursLog.find(x=>x.id===id);
-  if(h){ h.invoiced = cb.checked; markDirty(); renderHoursLog(); renderClientRoster(); renderReceivablesSummary(); }
+document.getElementById("taxRateInput").addEventListener("change", (e)=>{
+  STATE.taxRate = Number(e.target.value) || 0;
+  markDirty(); renderReceivablesSummary();
 });
 
-document.getElementById("hoursLogList").addEventListener("click", (e)=>{
-  const del = e.target.closest("[data-action='delete-hl']");
-  if(del){
-    const id = Number(del.dataset.id);
-    STATE.hoursLog = STATE.hoursLog.filter(x=>x.id!==id);
-    markDirty(); renderHoursLog(); renderClientRoster(); renderReceivablesSummary(); renderMonthlySummary();
-    return;
-  }
-  const statusBtn = e.target.closest("[data-action='toggle-hl-status']");
-  if(statusBtn){
-    const id = Number(statusBtn.dataset.id);
-    const h = STATE.hoursLog.find(x=>x.id===id);
-    if(h){ h.status = (h.status === "No-show") ? "Complete" : "No-show"; markDirty(); renderHoursLog(); renderMonthlySummary(); renderReceivablesSummary(); }
-  }
+/* ---- Log Hours / Monthly Summary events ---- */
+document.getElementById("monthlySummaryList").addEventListener("click", (e)=>{
+  const del = e.target.closest("[data-action='delete-summary-row']");
+  if(!del) return;
+  const id = Number(del.dataset.id);
+  STATE.hoursLog = STATE.hoursLog.filter(x=>x.id!==id);
+  markDirty(); renderClientRoster(); renderReceivablesSummary(); renderMonthlySummary();
 });
 
 document.getElementById("addHoursBtn").addEventListener("click", ()=>{
@@ -2514,10 +2969,11 @@ document.getElementById("addHoursBtn").addEventListener("click", ()=>{
     hours, note: noteInput.value.trim(), status: statusInput.value, invoiced:false
   });
   hoursInput.value = ""; noteInput.value = ""; dateInput.value = "";
-  markDirty(); renderHoursLog(); renderClientRoster(); renderReceivablesSummary(); renderMonthlySummary();
+  markDirty(); renderClientRoster(); renderReceivablesSummary(); renderMonthlySummary();
 });
 
 document.getElementById("summaryClientSelect").addEventListener("change", renderMonthlySummary);
+document.getElementById("summaryMonthSelect").addEventListener("change", renderMonthlySummary);
 
 /* ---- Non-Client Contacts events ---- */
 document.getElementById("contactsList").addEventListener("change", (e)=>{
