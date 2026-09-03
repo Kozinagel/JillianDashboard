@@ -371,15 +371,10 @@
     font-size:10.5px; font-weight:700; padding:3px 8px; border-radius:5px; background:var(--offsite-bg); color:var(--offsite);
     white-space:nowrap;
   }
-
-  /* ---------- Live Recent Emails ---------- */
-  .email-row{ padding:10px 0; border-bottom:1px solid var(--line-soft); }
-  .email-row:last-child{ border-bottom:none; }
-  .email-row .email-top{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
-  .email-row .email-subject{ font-size:13px; font-weight:700; }
-  .email-row .email-date{ font-size:11px; color:var(--ink-faint); white-space:nowrap; flex:none; }
-  .email-row .email-from{ font-size:12px; color:var(--ink-soft); margin-top:1px; }
-  .email-row .email-snippet{ font-size:12px; color:var(--ink-faint); margin-top:3px; }
+  .fam-location{ font-size:12px; color:var(--ink-soft); margin:3px 0 5px; }
+  .fam-location.conflict{
+    color:var(--urgent); font-weight:600; background:var(--urgent-bg); padding:4px 8px; border-radius:6px; display:inline-block;
+  }
 
   /* ---------- Non-Client Contacts ---------- */
   .contact-summary{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
@@ -458,7 +453,7 @@
         <button class="persist-btn" id="saveLocalBtn" style="display:none;">Save Data</button>
         <button class="persist-btn" id="goCloudBtn" style="display:none;">Set up cloud sync</button>
         <button class="persist-btn" id="advancedBtn">Advanced</button>
-        <button class="persist-btn" id="connectCalendarBtn" style="background:var(--accent-pine-soft); color:var(--accent-pine); border-color:var(--accent-pine);">📅 Refresh Live Data</button>
+        <button class="persist-btn" id="connectCalendarBtn" style="background:var(--accent-pine-soft); color:var(--accent-pine); border-color:var(--accent-pine);">📅 Refresh from Calendar</button>
         <span class="save-status" id="calendarStatus"></span>
       </div>
       <div class="today-pill" id="todayPill"></div>
@@ -580,10 +575,6 @@
             <select id="laClientSelect"></select>
             <button class="btn" id="addLaBtn">Add to bucket</button>
           </div>
-
-          <p class="inv-subhead" style="margin-top:20px;">Live Upcoming (next 90 days, from Calendar)</p>
-          <p class="panel-note" style="margin:-4px 0 10px;">Non-recurring calendar events only — routine stuff (drop-off, weekly coaching) is filtered out to avoid clutter. Click "Refresh from Calendar" above to populate this.</p>
-          <div id="liveUpcomingList"></div>
         </section>
 
       </div>
@@ -602,6 +593,7 @@
           <div id="familyList"></div>
           <div class="add-row">
             <input type="text" id="familyInput" placeholder="New item…" style="flex:1;">
+            <input type="text" id="familyLocation" placeholder="Location (optional)" style="width:160px;">
             <select id="familyCategorySelect">
               <option value="School">School</option>
               <option value="Soccer">Soccer</option>
@@ -629,19 +621,6 @@
             <input type="number" id="followupDays" placeholder="Days" style="width:70px;" min="0" max="30">
             <button class="btn" id="addFollowupBtn">Add</button>
           </div>
-        </section>
-
-        <!-- Live Recent Emails — raw list, no interpretation. Click "Refresh from Calendar"
-             above (it pulls Gmail too now) to populate. Nothing here gets auto-added to
-             the Follow-Up Queue or Actions Due — that still requires your judgment/confirmation. -->
-        <section class="panel">
-          <div class="panel-head">
-            <div class="titles">
-              <span class="panel-title">Live Recent Emails</span>
-              <span class="badge">Raw · last 3 days, for your own review</span>
-            </div>
-          </div>
-          <div id="liveEmailsList"></div>
         </section>
 
         <!-- 5. Service Line Snapshot -->
@@ -939,6 +918,12 @@ let STATE = {
     { id:1, client:"sakata", desc:"Final invoice + expenses (lumped per Fiona's Aug 25 agreement) — final balance $7,000.00 + expenses $2,578.78", amount:9578.78, when:"TBD — pending send" },
   ],
 
+  // Standing rule (added per user request): when scanning email for a refresh, actively
+  // watch for signs a Prospect-tagged contact has converted (signed agreement, first
+  // invoice discussion, "let's get started," etc.). Propose it in chat with the source,
+  // same check-off pattern as everything else — never auto-convert without confirmation.
+  // Once confirmed, use the "→ Convert to Client" button on their contact row (or do the
+  // same move programmatically): adds them to Client Roster, removes from this list.
   contacts: [
     { id:1,  name:"Jenn Broadbent",   context:"TurboCam · recurring 1:1 calls since February", category:"Prospect" },
     { id:2,  name:"Gillian Loft",     context:"Personal friend · casual Google Meet catch-ups", category:"Friend" },
@@ -989,20 +974,23 @@ let STATE = {
   // NOT in the SportsEngine app — the user confirmed SportsEngine is not being used/updated for
   // this. Calendar is the source of truth for soccer going forward; retired the SportsEngine-
   // watch placeholder items accordingly (the real schedule now lives in Look Ahead / Today).
+  //
+  // Standing rule (added per user request, after a real miss): a self-created Calendar event's
+  // location field is NOT automatically trusted. For any school/sports event with a specific
+  // venue, cross-check the calendar location against the most recent official email (from the
+  // school/rec department/coach) before treating either as correct. If they agree, use that
+  // location. If they disagree, the official email wins (school/rec/coach beats a manually-typed
+  // calendar entry, which can go stale) — set locationConflict:true and show both in the label so
+  // it's impossible to miss, rather than silently picking one. This is what went wrong with the
+  // Sept 2 Flag Football Combine: the calendar said "Russell Street track," the rec department's
+  // emails said "Couper Field — 35 Shaker Lane," and the calendar version was used without
+  // cross-checking. Each family item below can carry a `location` field, shown as its own line
+  // with a 📍 icon (or ⚠ if locationConflict is true).
   familyItems: [
     { id:1, label:"Confirm River's class schedule posted in Aspen — Jason said ~2pm Aug 28", category:"School", days:1, done:true },
-    { id:2, label:"Flag Football Combine / Skills Night — Wed Sept 2, 5-7:45pm, Littleton Russell Street track", category:"Flag Football", days:5, done:true },
+    { id:2, label:"Flag Football Combine / Skills Night — Wed Sept 2, 5-7:45pm", location:"Couper Field, 35 Shaker Lane (confirmed by rec dept email — calendar incorrectly said Russell Street track)", locationConflict:false, category:"Flag Football", days:5, done:true },
     { id:4, label:"MS Back to School Night — Mon Sept 14 (Littleton district calendar)", category:"School", days:17, done:false },
   ],
-
-  // Populated live from Google Calendar via the "Refresh from Calendar" button — not
-  // hand-edited. Non-recurring events in the next 90 days, no client tagging attempted
-  // (that requires judgment a raw API pull can't do).
-  liveUpcoming: [],
-
-  // Populated live from Gmail via the same refresh button. Raw, unfiltered, last 3 days —
-  // deliberately no auto-flagging into Follow-Up Queue/Actions Due, per the standing rule.
-  liveEmails: [],
 };
 
 function clientById(id){ return STATE.clients.find(c => c.id === id); }
@@ -1025,7 +1013,7 @@ function initGoogleAuth(){
   }
   googleTokenClient = google.accounts.oauth2.initTokenClient({
     client_id: GOOGLE_OAUTH_CLIENT_ID,
-    scope: "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.readonly",
+    scope: "https://www.googleapis.com/auth/calendar.readonly",
     callback: (resp) => {
       if(resp.error){
         setCalendarStatus("Calendar connection failed");
@@ -1052,46 +1040,11 @@ document.getElementById("connectCalendarBtn").addEventListener("click", ()=>{
   googleTokenClient.requestAccessToken({ prompt: googleAccessToken ? "" : "consent" });
 });
 
-/* ---- Live Recent Emails events ---- */
-document.getElementById("liveEmailsList").addEventListener("click", (e)=>{
-  const delBtn = e.target.closest("[data-action='email-delete']");
-  if(delBtn){
-    const id = Number(delBtn.dataset.id);
-    STATE.liveEmails = STATE.liveEmails.filter(x => x.id !== id);
-    renderLiveEmails();
-    return;
-  }
-  const taskBtn = e.target.closest("[data-action='email-task']");
-  if(taskBtn){
-    const id = Number(taskBtn.dataset.id);
-    openEmailTaskId = (openEmailTaskId === id) ? null : id;
-    renderLiveEmails();
-    return;
-  }
-  const confirmBtn = e.target.closest("[data-action='email-task-confirm']");
-  if(confirmBtn){
-    const id = Number(confirmBtn.dataset.id);
-    const form = confirmBtn.closest(".bt-form");
-    const label = form.querySelector(".email-task-label").value.trim();
-    if(!label) return;
-    const client = form.querySelector(".email-task-client").value || null;
-    const days = Number(form.querySelector(".email-task-days").value) || 3;
-    const nextId = STATE.actions.length ? Math.max(...STATE.actions.map(a=>a.id))+1 : 1;
-    STATE.actions.push({ id:nextId, client, label, days, done:false });
-    openEmailTaskId = null;
-    markDirty();
-    renderActions();
-    renderLiveEmails();
-  }
-});
-
 async function refreshLiveCalendar(){
   if(!googleAccessToken) return;
   setCalendarStatus("Refreshing…");
   try{
     await refreshTodayFromCalendar();
-    await refreshLookAheadFromCalendar();
-    await refreshLiveEmails();
     const stamp = new Date().toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
     setCalendarStatus("✓ Live as of " + stamp);
     markDirty();
@@ -1100,78 +1053,6 @@ async function refreshLiveCalendar(){
     setCalendarStatus("Refresh failed — click to retry");
   }
 }
-
-/* ---------- Live Recent Emails (raw, no interpretation) ---------- */
-async function refreshLiveEmails(){
-  const listRes = await fetch(
-    "https://gmail.googleapis.com/gmail/v1/users/me/messages?q=" + encodeURIComponent("newer_than:3d") + "&maxResults=15",
-    { headers: { Authorization: `Bearer ${googleAccessToken}` } }
-  );
-  if(listRes.status === 401){
-    googleAccessToken = null;
-    throw new Error("Gmail session expired — click Refresh again to reconnect");
-  }
-  if(!listRes.ok) throw new Error("Gmail API error " + listRes.status);
-  const listData = await listRes.json();
-  const ids = (listData.messages || []).map(m => m.id);
-
-  const details = await Promise.all(ids.map(id =>
-    fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From`,
-      { headers: { Authorization: `Bearer ${googleAccessToken}` } }
-    ).then(r => r.ok ? r.json() : null)
-  ));
-
-  STATE.liveEmails = details.filter(Boolean).map((msg, i) => {
-    const headers = (msg.payload && msg.payload.headers) || [];
-    const subject = (headers.find(h => h.name === "Subject") || {}).value || "(no subject)";
-    const from = (headers.find(h => h.name === "From") || {}).value || "";
-    return {
-      id: i + 1,
-      subject, from,
-      snippet: msg.snippet || "",
-      dateLabel: new Date(Number(msg.internalDate)).toLocaleDateString("en-US", {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"})
-    };
-  }).sort((a,b) => b.dateLabel.localeCompare(a.dateLabel));
-
-  renderLiveEmails();
-}
-
-let openEmailTaskId = null;
-function renderLiveEmails(){
-  const el = document.getElementById("liveEmailsList");
-  if(!el) return;
-  if(!STATE.liveEmails || STATE.liveEmails.length === 0){
-    el.innerHTML = `<div class="empty-state">Nothing pulled yet — click "Refresh Live Data" above.</div>`;
-    return;
-  }
-  el.innerHTML = STATE.liveEmails.map(e => `
-    <div class="email-row">
-      <div class="email-top">
-        <span class="email-subject">${e.subject}</span>
-        <div style="display:flex; gap:6px; align-items:center; flex:none;">
-          <span class="email-date">${e.dateLabel}</span>
-          <button class="icon-btn" data-action="email-task" data-id="${e.id}" title="Create a task from this email">＋Task</button>
-          <button class="icon-btn" data-action="email-delete" data-id="${e.id}" title="Remove from this list">✕</button>
-        </div>
-      </div>
-      <div class="email-from">${e.from}</div>
-      <div class="email-snippet">${e.snippet}</div>
-      ${openEmailTaskId === e.id ? renderEmailTaskForm(e) : ""}
-    </div>`).join("");
-}
-
-function renderEmailTaskForm(e){
-  const opts = `<option value="">— No client (personal/other) —</option>` +
-    STATE.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
-  return `<div class="bt-form" data-id="${e.id}" style="margin-top:8px;">
-    <input type="text" class="email-task-label" value="${escAttr(e.subject)}" style="flex:1; min-width:180px;">
-    <select class="email-task-client">${opts}</select>
-    <span class="bt-field-label">Days</span>
-    <input type="number" class="email-task-days" value="3" min="0" max="30">
-    <button class="bt-save" data-action="email-task-confirm" data-id="${e.id}">Add to Actions Due</button>
-  </div>`;
-}
-
 
 async function fetchCalendarEvents(start, end){
   const params = new URLSearchParams({
@@ -1241,34 +1122,6 @@ async function refreshTodayFromCalendar(){
   STATE.todayBlocks = blocks;
   STATE.todayLabel = now.toLocaleDateString("en-US", {weekday:"short", month:"short", day:"numeric"}) + " · live from Calendar";
   renderToday();
-}
-
-async function refreshLookAheadFromCalendar(){
-  const now = new Date();
-  const end90 = new Date(now.getTime() + 90*24*60*60*1000);
-  const events = await fetchCalendarEvents(now, end90);
-
-  const nonRecurring = events.filter(e => !e.recurringEventId && (e.start.dateTime || e.start.date));
-  STATE.liveUpcoming = nonRecurring.slice(0, 40).map(e => ({
-    title: e.summary || "(untitled)",
-    dateLabel: new Date(e.start.dateTime || e.start.date).toLocaleDateString("en-US", {weekday:"short", month:"short", day:"numeric"}),
-    location: e.location || ""
-  }));
-  renderLiveUpcoming();
-}
-
-function renderLiveUpcoming(){
-  const el = document.getElementById("liveUpcomingList");
-  if(!el) return;
-  if(!STATE.liveUpcoming || STATE.liveUpcoming.length === 0){
-    el.innerHTML = `<div class="empty-state">Nothing pulled yet — click "Refresh from Calendar" above.</div>`;
-    return;
-  }
-  el.innerHTML = STATE.liveUpcoming.map(u => `
-    <div class="la-item">
-      <div class="top"><span class="title">${u.title}</span></div>
-      <div class="note">${u.dateLabel}${u.location ? " · " + u.location : ""}</div>
-    </div>`).join("");
 }
 
 /* =========================================================
@@ -1434,8 +1287,6 @@ function loadIntoState(obj){
   STATE.upcomingInvoices = obj.upcomingInvoices || [];
   STATE.contacts = obj.contacts || [];
   STATE.familyItems = obj.familyItems || STATE.familyItems;
-  STATE.liveUpcoming = obj.liveUpcoming || [];
-  STATE.liveEmails = obj.liveEmails || [];
   renderAll();
   suppressDirty = false;
 }
@@ -2036,6 +1887,7 @@ function renderContacts(){
       <select class="contact-cat-select ${c.category ? "" : "unset"}" data-action="set-category" data-id="${c.id}">
         ${categoryOptionsHtml(c.category)}
       </select>
+      ${c.category === "Prospect" ? `<button class="mini-btn" data-action="convert-to-client" data-id="${c.id}">→ Convert to Client</button>` : ""}
       <button class="icon-btn" data-action="delete-contact" data-id="${c.id}" title="Delete">✕</button>
     </div>`).join("");
 }
@@ -2075,6 +1927,7 @@ function renderFamilyItems(){
       <div class="check ${f.done ? "checked":""}" data-action="toggle-family" data-id="${f.id}"></div>
       <div class="body ${f.done ? "done":""}">
         <div class="lbl">${f.label}</div>
+        ${f.location ? `<div class="fam-location ${f.locationConflict ? "conflict":""}">${f.locationConflict ? "⚠ " : "📍 "}${f.location}${f.locationConflict ? ` — conflicts with calendar, verify before you go` : ""}</div>` : ""}
         <div class="rowtags">
           <span class="fam-cat-badge">${f.category}</span>
         </div>
@@ -2115,8 +1968,6 @@ function renderAll(){
   renderContacts();
   renderClientRoster();
   renderFamilyItems();
-  renderLiveUpcoming();
-  renderLiveEmails();
 }
 
 /* =========================================================
@@ -2445,10 +2296,27 @@ document.getElementById("contactsList").addEventListener("change", (e)=>{
 
 document.getElementById("contactsList").addEventListener("click", (e)=>{
   const del = e.target.closest("[data-action='delete-contact']");
-  if(!del) return;
-  const id = Number(del.dataset.id);
-  STATE.contacts = STATE.contacts.filter(x=>x.id!==id);
-  markDirty(); renderContacts();
+  if(del){
+    const id = Number(del.dataset.id);
+    STATE.contacts = STATE.contacts.filter(x=>x.id!==id);
+    markDirty(); renderContacts();
+    return;
+  }
+  const convert = e.target.closest("[data-action='convert-to-client']");
+  if(convert){
+    const id = Number(convert.dataset.id);
+    const contact = STATE.contacts.find(x=>x.id===id);
+    if(!contact) return;
+    if(!confirm(`Convert ${contact.name} from Prospect to a full Client Roster entry? They'll be removed from Non-Client Contacts.`)) return;
+    let clientId = slugify(contact.name);
+    let suffix = 2;
+    while(clientById(clientId)){ clientId = slugify(contact.name) + "-" + suffix; suffix++; }
+    STATE.clients.push({ id:clientId, name:contact.name, meta:contact.context || "", engagements:[], prepStyle:"none" });
+    STATE.contacts = STATE.contacts.filter(x=>x.id!==id);
+    markDirty();
+    renderAll();
+    alert(`${contact.name} added to Client Roster — set their service line and billing terms whenever you're ready.`);
+  }
 });
 
 document.getElementById("addContactBtn").addEventListener("click", ()=>{
@@ -2536,13 +2404,14 @@ document.getElementById("familyList").addEventListener("click", (e)=>{
 
 document.getElementById("addFamilyBtn").addEventListener("click", ()=>{
   const input = document.getElementById("familyInput");
+  const locInput = document.getElementById("familyLocation");
   const catSel = document.getElementById("familyCategorySelect");
   const daysInput = document.getElementById("familyDays");
   const label = input.value.trim();
   if(!label) return;
   const nextId = STATE.familyItems.length ? Math.max(...STATE.familyItems.map(f=>f.id))+1 : 1;
-  STATE.familyItems.push({ id:nextId, label, category:catSel.value, days:Number(daysInput.value)||7, done:false });
-  input.value = ""; daysInput.value = "";
+  STATE.familyItems.push({ id:nextId, label, location:locInput.value.trim(), locationConflict:false, category:catSel.value, days:Number(daysInput.value)||7, done:false });
+  input.value = ""; locInput.value = ""; daysInput.value = "";
   markDirty(); renderFamilyItems();
 });
 
