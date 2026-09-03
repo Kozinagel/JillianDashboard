@@ -549,6 +549,63 @@
   .biz-info-grid input{
     font-size:13px; padding:8px 10px; border-radius:7px; border:1px solid var(--line); background:var(--paper); color:var(--ink);
   }
+
+  /* =========================================================
+     MOBILE — everything below this point only applies at phone
+     widths. The rest of the file was built desktop-first; this
+     block is the actual phone-readiness pass.
+     ========================================================= */
+  @media (max-width: 680px){
+    #app{ padding:16px 14px 60px; }
+
+    header{ gap:10px; }
+    .brand h1{ font-size:18px; }
+    .brand .sub{ font-size:12px; }
+    .today-pill{ font-size:11px; }
+
+    .persist-bar{ padding:6px; gap:6px; width:100%; box-sizing:border-box; }
+    .persist-btn{ font-size:11px; padding:6px 9px; }
+    .save-status{ font-size:11px; }
+    .header-right{ width:100%; }
+
+    .page-nav{ gap:5px; }
+    .page-nav-btn{ font-size:12px; padding:8px 12px; flex:1; text-align:center; }
+
+    .panel{ padding:16px 14px; }
+    .panel-title{ font-size:14px; }
+
+    /* Client Roster rows: 4-column grid → stacked */
+    .cr-row{ grid-template-columns:1fr; gap:8px; }
+    .cr-engagements{ flex-direction:row; flex-wrap:wrap; }
+    .cr-billing{ align-items:stretch; }
+
+    /* Monthly Summary rows: 6-column grid → simple stacked list, avoids fragile grid-area
+       mapping since the 6th child is sometimes a delete button, sometimes an empty div */
+    .summary-row{
+      display:flex; flex-direction:column; gap:3px; position:relative; padding:10px 44px 10px 0;
+    }
+    .summary-row .sr-hours, .summary-row .sr-fee{ text-align:left; }
+    .summary-row .icon-btn{ position:absolute; top:8px; right:0; }
+
+    .tax-quarters{ grid-template-columns:1fr 1fr; }
+    .tax-summary{ gap:8px; }
+
+    .board-col-head{ padding:10px 12px; }
+    .board-card{ padding:9px 11px; }
+
+    .rec-tile, .selfpay-tile, .tax-q-tile{ min-width:0; }
+
+    .modal-card{ padding:16px; max-height:85vh; }
+    .advanced-textarea{ min-height:200px; }
+
+    .add-row{ gap:6px; }
+    .add-row input, .add-row select{ font-size:14px; } /* 16px avoids iOS zoom-on-focus, but keep readable at 14px minimum */
+
+    .contact-summary{ gap:6px; }
+    .cat-chip{ font-size:10.5px; }
+
+    .biz-info-grid{ grid-template-columns:1fr; }
+  }
 </style>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
