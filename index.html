@@ -1165,14 +1165,73 @@ let STATE = {
     { id:55, client:"glyphic", date:"2026-08-26", hours:1, note:"Sarah · 5:00-6:00pm", invoiced:true },
     { id:56, client:"glyphic", date:"2026-08-31", hours:1, note:"Scotty · 3:00-4:00pm", invoiced:true },
 
-    // ---- SGH-hr / SGH-admin: monthly totals only (no session-level sheet available) ----
-    { id:57, client:"sgh-hr", date:"2026-01-08", hours:5.5, note:"Jan monthly total (aggregate, not session-level — $1,925 ÷ $350/hr)", invoiced:true },
-    { id:58, client:"sgh-hr", date:"2026-03-03", hours:2, note:"Jan invoice, monthly total (aggregate — $700 ÷ $350/hr)", invoiced:true },
-    { id:59, client:"sgh-hr", date:"2026-06-01", hours:7.75, note:"Feb, Mar & Apr, monthly total (aggregate — $2,712.50 ÷ $350/hr)", invoiced:true },
-    { id:60, client:"sgh-hr", date:"2026-07-13", hours:2.5, note:"June, monthly total (aggregate — $875 ÷ $350/hr)", invoiced:true },
-    { id:61, client:"sgh-hr", date:"2026-08-24", hours:3, note:"July, monthly total (aggregate — $1,050 ÷ $350/hr)", invoiced:true },
-    { id:62, client:"sgh-admin", date:"2026-07-13", hours:2, note:"June, monthly total (aggregate — $700 ÷ $350/hr)", invoiced:true },
-    { id:63, client:"sgh-admin", date:"2026-09-01", hours:2, note:"July & Aug, monthly total (aggregate — $700 ÷ $350/hr)", invoiced:true },
+    // ---- SGH-Admin (Melissa) real 2026 sessions ----
+    { id:57, client:"sgh-admin", date:"2026-01-12", hours:1.0, note:"Melissa · 9:00-10:00am", invoiced:true },
+    { id:58, client:"sgh-admin", date:"2026-01-26", hours:1.0, note:"Melissa · 9:00-10:00am", invoiced:true },
+    { id:59, client:"sgh-admin", date:"2026-02-24", hours:1.0, note:"Melissa & Shino · 11:00am-12:00pm", invoiced:true },
+    { id:60, client:"sgh-admin", date:"2026-03-12", hours:1.5, note:"Melissa · 9:00-10:30am", invoiced:true },
+    { id:61, client:"sgh-admin", date:"2026-03-13", hours:0.5, note:"Melissa · 3:00-3:30pm", invoiced:true },
+    { id:62, client:"sgh-admin", date:"2026-03-23", hours:0.5, note:"Melissa · 3:00-3:30pm", invoiced:true },
+    { id:63, client:"sgh-admin", date:"2026-03-26", hours:1.0, note:"Melissa & Shino · 9:00-10:00am", invoiced:true },
+    { id:64, client:"sgh-admin", date:"2026-04-10", hours:1.0, note:"Melissa · 12:30-1:30pm", invoiced:true },
+    { id:65, client:"sgh-admin", date:"2026-04-20", hours:1.0, note:"Melissa · 9:00-10:00am", invoiced:true },
+    { id:66, client:"sgh-admin", date:"2026-05-07", hours:1.0, note:"Melissa · 9:00-10:00am", invoiced:true },
+    { id:67, client:"sgh-admin", date:"2026-05-18", hours:1.0, note:"Melissa · 9:00-10:00am", invoiced:true },
+    { id:68, client:"sgh-admin", date:"2026-06-05", hours:1.0, note:"Melissa & Shino · 11:30am-12:30pm", invoiced:true },
+    { id:69, client:"sgh-admin", date:"2026-06-08", hours:0.5, note:"Melissa · 3:30-4:00pm", invoiced:true },
+    { id:70, client:"sgh-admin", date:"2026-06-18", hours:1.0, note:"Melissa & Shino · 9:00-10:00am", invoiced:true },
+    { id:71, client:"sgh-admin", date:"2026-07-13", hours:1.0, note:"Melissa · 9:30-10:30am", invoiced:true },
+    { id:72, client:"sgh-admin", date:"2026-08-10", hours:1.0, note:"Melissa & Shino · 9:00-10:00am", invoiced:true },
+    // ---- SGH-HR (Alissa) real 2026 sessions ----
+    { id:73, client:"sgh-hr", date:"2026-01-15", hours:1.0, note:"Alissa · 4:00-5:00pm", invoiced:true },
+    { id:74, client:"sgh-hr", date:"2026-01-29", hours:1.0, note:"Alissa · 4:00-5:00pm", invoiced:true },
+    { id:75, client:"sgh-hr", date:"2026-02-12", hours:1.0, note:"Alissa · 4:00-5:00pm", invoiced:true },
+    { id:76, client:"sgh-hr", date:"2026-03-09", hours:0.75, note:"Megan · 11:00-11:45am (TD)", invoiced:true },
+    { id:77, client:"sgh-hr", date:"2026-03-13", hours:1.0, note:"Alissa · 2:00-3:00pm", invoiced:true },
+    { id:78, client:"sgh-hr", date:"2026-03-13", hours:0.5, note:"Megan · 10:00-10:30am (TD)", invoiced:true },
+    { id:79, client:"sgh-hr", date:"2026-03-26", hours:1.0, note:"Alissa · 4:00-5:00pm", invoiced:true },
+    { id:80, client:"sgh-hr", date:"2026-04-03", hours:0.75, note:"Megan · 10:30-11:15am (TD)", invoiced:true },
+    { id:81, client:"sgh-hr", date:"2026-04-10", hours:0.75, note:"Megan · 10:30-11:15am (TD)", invoiced:true },
+    { id:82, client:"sgh-hr", date:"2026-04-20", hours:1.0, note:"Alissa · 1:00-2:00pm", invoiced:true },
+    { id:83, client:"sgh-hr", date:"2026-05-07", hours:1.0, note:"Alissa · 1:00-2:00pm", invoiced:true },
+    { id:84, client:"sgh-hr", date:"2026-06-12", hours:1.0, note:"Megan · 10:00-11:00am (TD)", invoiced:true },
+    { id:85, client:"sgh-hr", date:"2026-06-16", hours:1.0, note:"Alissa · 3:00-4:00pm", invoiced:true },
+    { id:86, client:"sgh-hr", date:"2026-07-01", hours:1.0, note:"Donna · 9:30-10:30am (Accounting)", invoiced:true },
+    { id:87, client:"sgh-hr", date:"2026-07-13", hours:1.0, note:"Solo work · Marketing Doc Updates", invoiced:true },
+    { id:88, client:"sgh-hr", date:"2026-07-16", hours:1.0, note:"Alissa · 3:00-4:00pm", invoiced:true },
+    // ---- Constructive Bio real 2026 sessions ----
+    { id:89, client:"generate", date:"2026-01-27", hours:1.0, note:"Ola · 11:00am-12:00pm", invoiced:true },
+    { id:90, client:"generate", date:"2026-02-02", hours:1.0, note:"Daniel · 12:00-1:00pm", invoiced:true },
+    { id:91, client:"generate", date:"2026-02-03", hours:1.0, note:"Ola · 10:30-11:30am", invoiced:true },
+    { id:92, client:"generate", date:"2026-02-10", hours:1.0, note:"Ola · 11:00am-12:00pm", invoiced:true },
+    { id:93, client:"generate", date:"2026-02-11", hours:1.0, note:"Daniel · 12:00-1:00pm", invoiced:true },
+    { id:94, client:"generate", date:"2026-02-17", hours:1.0, note:"Ola · 11:00am-12:00pm", invoiced:true },
+    { id:95, client:"generate", date:"2026-02-19", hours:0.75, note:"Ola & Daniel · 10:30-11:15am", invoiced:true },
+    { id:96, client:"generate", date:"2026-03-03", hours:1.0, note:"Ola · 11:00am-12:00pm", invoiced:true },
+    { id:97, client:"generate", date:"2026-03-04", hours:1.0, note:"Daniel · 12:00-1:00pm", invoiced:true },
+    { id:98, client:"generate", date:"2026-03-11", hours:1.0, note:"Ola · 10:00-11:00am", invoiced:true },
+    { id:99, client:"generate", date:"2026-03-18", hours:1.0, note:"Ola · 8:00-9:00am", invoiced:true },
+    { id:100, client:"generate", date:"2026-03-23", hours:1.5, note:"OKRs · 11:30am-1:00pm", invoiced:true },
+    { id:101, client:"generate", date:"2026-03-24", hours:1.0, note:"Ola · 12:00-1:00pm", invoiced:true },
+    { id:102, client:"generate", date:"2026-03-25", hours:1.0, note:"Ola · 10:00-11:00am", invoiced:true },
+    { id:103, client:"generate", date:"2026-03-30", hours:1.0, note:"Ola · 8:30-9:30am", invoiced:true },
+    { id:104, client:"generate", date:"2026-04-01", hours:1.0, note:"Daniel · 12:00-1:00pm", invoiced:true },
+    { id:105, client:"generate", date:"2026-04-07", hours:1.0, note:"Ola · 11:00am-12:00pm", invoiced:true },
+    { id:106, client:"generate", date:"2026-04-14", hours:1.0, note:"Ola · 12:00-1:00pm", invoiced:true },
+    { id:107, client:"generate", date:"2026-04-17", hours:1.0, note:"Daniel · 12:00-1:00pm", invoiced:true },
+    { id:108, client:"generate", date:"2026-04-28", hours:1.0, note:"Ola · 11:00am-12:00pm", invoiced:true },
+    { id:109, client:"generate", date:"2026-04-28", hours:1.0, note:"Rosie · 10:00-11:00am", invoiced:true },
+    { id:110, client:"generate", date:"2026-05-11", hours:1.0, note:"OKRs · 11:00am-12:00pm", invoiced:true },
+    { id:111, client:"generate", date:"2026-05-26", hours:1.0, note:"Ola · 11:00am-12:00pm", invoiced:true },
+    { id:112, client:"generate", date:"2026-06-01", hours:1.0, note:"Ola · 10:30-11:30am", invoiced:true },
+    { id:113, client:"generate", date:"2026-06-04", hours:1.0, note:"Daniel · 8:30-9:30am", invoiced:true },
+    { id:114, client:"generate", date:"2026-06-09", hours:1.0, note:"Ola · 11:00am-12:00pm", invoiced:true },
+    { id:115, client:"generate", date:"2026-06-16", hours:1.0, note:"Ola · 10:00-11:00am", invoiced:true },
+    { id:116, client:"generate", date:"2026-06-29", hours:1.5, note:"OKRs · 10:30am-12:00pm", invoiced:true },
+    { id:117, client:"generate", date:"2026-07-08", hours:1.0, note:"Daniel · 12:00-1:00pm", invoiced:true },
+    { id:118, client:"generate", date:"2026-07-15", hours:1.0, note:"Daniel · 12:00-1:00pm", invoiced:true },
+    { id:119, client:"generate", date:"2026-07-30", hours:1.0, note:"Daniel · 12:00-1:00pm", invoiced:true },
+    { id:120, client:"generate", date:"2026-08-26", hours:1.0, note:"Daniel · 12:00-1:00pm", invoiced:true },
   ],
 
   // Annual revenue target. YTD Received is now built entirely from individually-logged
@@ -1197,8 +1256,8 @@ let STATE = {
   invoices: [
     // ---- Payments Received (28 items, sheet total $90,929.25) ----
     { id:1, client:"radar", desc:"Prepay 10 hours July+", amount:3750, status:"paid", sentDate:"2026-07-13", dueDate:"", kind:"fee" },
-    { id:2, client:"sgh-hr", desc:"June hours", amount:875, status:"paid", sentDate:"2026-07-13", dueDate:"", kind:"fee" },
-    { id:3, client:"sgh-admin", desc:"June hours", amount:700, status:"paid", sentDate:"2026-07-13", dueDate:"", kind:"fee" },
+    { id:2, client:"sgh-admin", desc:"June hours", amount:875, status:"paid", sentDate:"2026-07-13", dueDate:"", kind:"fee" },
+    { id:3, client:"sgh-hr", desc:"June hours", amount:700, status:"paid", sentDate:"2026-07-13", dueDate:"", kind:"fee" },
     { id:4, client:"glyphic", desc:"Jun coaching", amount:2247.75, status:"paid", sentDate:"2026-07-06", dueDate:"", kind:"fee" },
     { id:5, client:"sgh-admin", desc:"Feb, Mar & Apr", amount:2975, status:"paid", sentDate:"2026-06-01", dueDate:"", kind:"fee" },
     { id:6, client:"radar", desc:"Prepay 10 hours May+ (reminded 7/13)", amount:3750, status:"paid", sentDate:"2026-06-01", dueDate:"", kind:"fee" },
@@ -1667,7 +1726,7 @@ function loadIntoState(obj){
   // once. This runs automatically the next time the dashboard is opened and signed into —
   // no manual paste, no Advanced editor, nothing to click. STATE.dataFixVersion tracks that
   // it already ran, so it won't repeat and won't stomp on anything you edit after this loads.
-  const CURRENT_DATA_FIX_VERSION = 3;
+  const CURRENT_DATA_FIX_VERSION = 4;
   if(!obj.dataFixVersion || obj.dataFixVersion < CURRENT_DATA_FIX_VERSION){
     STATE.invoices = JSON.parse(JSON.stringify(SEED_INVOICES));
     STATE.billingTerms = JSON.parse(JSON.stringify(SEED_BILLING_TERMS));
