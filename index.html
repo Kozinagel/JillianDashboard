@@ -1333,6 +1333,13 @@ let STATE = {
   ],
 };
 
+// Snapshot of the correct, freshly-rebuilt Sept 3 data — captured before any Firestore load
+// can overwrite it, so it's available for the one-time forced migration below regardless of
+// what's already saved in the database.
+const SEED_INVOICES = JSON.parse(JSON.stringify(STATE.invoices));
+const SEED_BILLING_TERMS = JSON.parse(JSON.stringify(STATE.billingTerms));
+const SEED_HOURS_LOG = JSON.parse(JSON.stringify(STATE.hoursLog));
+
 function clientById(id){ return STATE.clients.find(c => c.id === id); }
 
 /* =========================================================
@@ -1654,6 +1661,24 @@ function loadIntoState(obj){
 
   STATE.contacts = obj.contacts || [];
   STATE.familyItems = obj.familyItems || STATE.familyItems;
+
+  // Forced one-time database fix (Sept 3): whatever is saved for invoices/billingTerms/
+  // hoursLog gets overwritten with the corrected data below, exactly once. This runs
+  // automatically the next time the dashboard is opened and signed into — no manual paste,
+  // no Advanced editor, nothing to click. STATE.dataFixVersion tracks that it already ran,
+  // so it won't repeat and won't stomp on anything you edit after this loads.
+  const CURRENT_DATA_FIX_VERSION = 2;
+  if(!obj.dataFixVersion || obj.dataFixVersion < CURRENT_DATA_FIX_VERSION){
+    STATE.invoices = JSON.parse(JSON.stringify(SEED_INVOICES));
+    STATE.billingTerms = JSON.parse(JSON.stringify(SEED_BILLING_TERMS));
+    STATE.hoursLog = JSON.parse(JSON.stringify(SEED_HOURS_LOG));
+    STATE.dataFixVersion = CURRENT_DATA_FIX_VERSION;
+    renderAll();
+    suppressDirty = false;
+    markDirty(); // saves the corrected data back immediately, once
+    return;
+  }
+
   renderAll();
   suppressDirty = false;
 }
