@@ -1421,7 +1421,7 @@ let STATE = {
     { id:30, client:"sgh-admin", desc:"July & Aug hours", amount:700, status:"sent", sentDate:"2026-09-01", dueDate:"", kind:"fee" },
     { id:31, client:"sgh-hr", desc:"July hours", amount:1050, status:"sent", sentDate:"2026-08-24", dueDate:"", kind:"fee" },
     { id:32, client:"radar", desc:"Prepay 10 hours Aug+ — sheet shows Sent; you separately told me it cleared via ACH 8/28, but reverted this to match the sheet exactly per your request", amount:3750, status:"sent", sentDate:"2026-08-24", dueDate:"", kind:"fee" },
-    { id:33, client:"glyphic", desc:"July hours", amount:3246.75, status:"sent", sentDate:"2026-08-07", dueDate:"", kind:"fee" },
+    { id:33, client:"glyphic", desc:"July hours (sent 8/7, paid via ACH per Ramp payment notification)", amount:3246.75, status:"paid", sentDate:"2026-09-04", dueDate:"", kind:"fee" },
 
     // ---- Invoices Pending (15 items, sheet total $40,100.00) ----
     { id:34, client:"nova", desc:"EA Ignite 3-day in-person (Dec)", amount:6000, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
@@ -1869,6 +1869,63 @@ function loadIntoState(obj){
     renderAll();
     suppressDirty = false;
     markDirty(); // saves the corrected data back immediately, once
+    return;
+  }
+
+  // One-time additive enrichment (Sept 4): new contacts found by scanning ~a year of Sent
+  // mail, appended only if a contact with that name isn't already there. Never overwrites
+  // anything you've already categorized — this only adds names you don't have yet, all
+  // uncategorized so you can assign the right bucket yourself.
+  const CURRENT_CONTACTS_ENRICH_VERSION = 1;
+  if(!obj.contactsEnrichVersion || obj.contactsEnrichVersion < CURRENT_CONTACTS_ENRICH_VERSION){
+    const candidates = [
+      { name:"Liz Mayhew", context:"lmayhew@meridianatg.com — Delaware LLC compliance / registered agent contact" },
+      { name:"Mary Hirtle", context:"mhirtle@meridianatg.com — Delaware LLC compliance contact, same thread as Liz Mayhew" },
+      { name:"Connor Lyons", context:"clyons@littletonps.org — River's travel soccer coach at school" },
+      { name:"Cassandra Caley", context:"ccaley@littletonps.org — School nurse/admin, handled River's physical & concussion notice" },
+      { name:"Amy Manheimer", context:"amanheimer@littletonps.org — River's 8th grade math teacher" },
+      { name:"Ryan Burrus", context:"ryan.burrus@lucix.io — Professional tech talk / networking contact" },
+      { name:"Jae Starfox", context:"starfox@take3presents.com — Kaizo's colleague on the Take3 mediation prospect thread" },
+      { name:"Rebecca Hammond", context:"rebecca.hammond@joincarve.com — Carve AI ops contact, handles Sakata expense reports" },
+      { name:"Jeremy", context:"jeremy@goburrows.com — Professional friend, met up in person at APC Nashville" },
+      { name:"Krysta Howes", context:"krysta@novachiefofstaff.com — Nova Programs Director; very frequent correspondent for APC/Nova logistics — worth a look even though Nova itself is tracked as a client" },
+    ];
+    const existingNames = new Set(STATE.contacts.map(c => c.name));
+    let nextId = STATE.contacts.length ? Math.max(...STATE.contacts.map(c=>c.id))+1 : 1;
+    candidates.forEach(cand => {
+      if(!existingNames.has(cand.name)){
+        STATE.contacts.push({ id:nextId++, name:cand.name, context:cand.context, actionItem:"", category:"" });
+      }
+    });
+    STATE.contactsEnrichVersion = CURRENT_CONTACTS_ENRICH_VERSION;
+    renderAll();
+    suppressDirty = false;
+    markDirty();
+    return;
+  }
+
+  // One-time targeted payment updates: confirmed via payment notification emails that these
+  // specific invoices actually cleared. Each only touches its own single invoice by matching
+  // description+amount — never replaces the array, so any manual edits you've made to other
+  // invoices since are left completely alone.
+  const CURRENT_PAYMENT_FIX_VERSION = 2;
+  if(!obj.paymentFixVersion || obj.paymentFixVersion < CURRENT_PAYMENT_FIX_VERSION){
+    const glyphicJuly = STATE.invoices.find(i => i.client === "glyphic" && i.amount === 3246.75 && (i.desc||"").startsWith("July hours"));
+    if(glyphicJuly && glyphicJuly.status !== "paid"){
+      glyphicJuly.status = "paid";
+      glyphicJuly.sentDate = "2026-09-04";
+      glyphicJuly.desc = "July hours (sent 8/7, paid via ACH per Ramp payment notification)";
+    }
+    const sghAdminJulAug = STATE.invoices.find(i => i.client === "sgh-admin" && i.amount === 700 && (i.desc||"").startsWith("July & Aug hours"));
+    if(sghAdminJulAug && sghAdminJulAug.status !== "paid"){
+      sghAdminJulAug.status = "paid";
+      sghAdminJulAug.sentDate = "2026-09-08";
+      sghAdminJulAug.desc = "July & Aug hours — invoice #08010826 dated 8/1, check #9965524 dated 9/8 (confirmed via Drive invoice sheet + SGH remittance advice)";
+    }
+    STATE.paymentFixVersion = CURRENT_PAYMENT_FIX_VERSION;
+    renderAll();
+    suppressDirty = false;
+    markDirty();
     return;
   }
 
