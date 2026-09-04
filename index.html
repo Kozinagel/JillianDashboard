@@ -425,6 +425,22 @@
     color:var(--urgent); font-weight:600; background:var(--urgent-bg); padding:4px 8px; border-radius:6px; display:inline-block;
   }
 
+  /* ---------- Personal Projects ---------- */
+  .pp-card{
+    border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:10px; background:var(--paper);
+  }
+  .pp-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px; }
+  .pp-name{ font-weight:700; font-size:13.5px; }
+  .pp-date{ font-size:11.5px; color:var(--ink-faint); font-variant-numeric:tabular-nums; }
+  .pp-task-row{ display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid var(--line-soft); }
+  .pp-task-row:last-child{ border-bottom:none; }
+  .pp-task-row.done .pp-task-text{ text-decoration:line-through; color:var(--ink-faint); }
+  .pp-task-text{ flex:1; font-size:12.5px; }
+  .pp-add-task{ display:flex; gap:6px; margin-top:8px; }
+  .pp-add-task input{
+    flex:1; font-size:12.5px; padding:6px 8px; border-radius:6px; border:1px solid var(--line); background:var(--paper); color:var(--ink);
+  }
+
   /* ---------- Non-Client Contacts ---------- */
   .contact-summary{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
   .cat-chip{
@@ -558,6 +574,12 @@
   @media (max-width: 680px){
     #app{ padding:16px 14px 60px; }
 
+    /* Promote Family & School Watch to the top of Main on mobile, without changing desktop
+       order or touching the DOM — .col wrappers disappear from layout, letting order:-1
+       float the panel above everything else that follows it in the markup. */
+    .col{ display:contents; }
+    .panel-family{ order:-1; }
+
     header{ gap:10px; }
     .brand h1{ font-size:18px; }
     .brand .sub{ font-size:12px; }
@@ -658,6 +680,7 @@
           <option value="hoursLog">Hours Log</option>
           <option value="contacts">Non-Client Contacts</option>
           <option value="familyItems">Family &amp; School Watch</option>
+          <option value="personalProjects">Personal Projects</option>
         </select>
         <button class="btn btn-ghost" id="loadAdvancedBtn">Load current</button>
       </div>
@@ -690,6 +713,33 @@
       <div class="add-row" style="margin-top:10px;">
         <button class="btn" id="saveLogCallBtn">Log it</button>
         <button class="btn btn-ghost" id="cancelLogCallBtn">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add a New Task — speak or type, goes to Actions Due or a Personal Project -->
+  <div id="addTaskModal" class="modal-overlay">
+    <div class="modal-card" style="max-width:480px;">
+      <div class="modal-head">
+        <h3 class="display">Add a New Task</h3>
+        <button class="modal-close" id="closeAddTaskBtn" title="Close">✕</button>
+      </div>
+      <div class="add-row" style="flex-direction:column; align-items:stretch;">
+        <div style="display:flex; gap:8px; align-items:flex-start;">
+          <textarea id="addTaskText" class="advanced-textarea" style="min-height:70px; flex:1;" placeholder="Type, or tap the mic and speak…"></textarea>
+          <button class="btn" id="addTaskMicBtn" title="Speak this task" style="flex:none; font-size:18px; padding:8px 12px;">🎤</button>
+        </div>
+        <span class="panel-note" id="addTaskMicNote"></span>
+        <select id="addTaskTarget"></select>
+        <div id="addTaskDaysRow" style="display:flex; gap:8px; align-items:center;">
+          <span class="bt-field-label">Days</span>
+          <input type="number" id="addTaskDays" value="7" min="0" max="60" style="width:80px;">
+        </div>
+      </div>
+      <div class="auth-error" id="addTaskError"></div>
+      <div class="add-row" style="margin-top:10px;">
+        <button class="btn" id="saveAddTaskBtn">Add</button>
+        <button class="btn btn-ghost" id="cancelAddTaskBtn">Cancel</button>
       </div>
     </div>
   </div>
@@ -730,7 +780,8 @@
     <div id="page-main" class="page">
     <div class="log-call-row">
       <button class="btn" id="logCallBtn">📞 Log a Call</button>
-      <span class="panel-note">For ad hoc or overtime calls — logs straight into that client's Hours Log</span>
+      <button class="btn" id="addTaskBtn">✚ Add a New Task</button>
+      <span class="panel-note">Log a Call → Hours Log · Add a New Task → Actions Due or a Personal Project</span>
     </div>
     <div class="grid">
       <div class="col">
@@ -792,7 +843,7 @@
       <div class="col">
 
         <!-- 9. Family & School Watch (moved next to Today at a Glance) -->
-        <section class="panel">
+        <section class="panel panel-family">
           <div class="panel-head">
             <div class="titles">
               <span class="panel-title">Family &amp; School Watch</span>
@@ -812,6 +863,21 @@
             </select>
             <input type="number" id="familyDays" placeholder="Days" style="width:70px;" min="0" max="60">
             <button class="btn" id="addFamilyBtn">Add</button>
+          </div>
+        </section>
+
+        <!-- Personal Projects — party planning, trips, anything ongoing that isn't client work -->
+        <section class="panel">
+          <div class="panel-head">
+            <div class="titles">
+              <span class="panel-title">Personal Projects</span>
+            </div>
+          </div>
+          <div id="personalProjectsList"></div>
+          <div class="add-row">
+            <input type="text" id="ppNameInput" placeholder="New project (e.g. Anniversary trip)" style="flex:1; min-width:160px;">
+            <input type="date" id="ppDateInput" title="Target date (optional)">
+            <button class="btn" id="addPersonalProjectBtn">Add project</button>
           </div>
         </section>
 
@@ -1306,6 +1372,15 @@ let STATE = {
   businessInfo: { name:"", address:"", phone:"", email:"", ein:"", bankName:"", bankAccount:"", achRouting:"" },
   nextInvoiceNumber: 1,
 
+  // Personal Projects — ongoing personal initiatives (party planning, trips, anything that
+  // isn't client work), each with an optional target date and its own task checklist.
+  personalProjects: [
+    { id:1, name:"Mom & Dad's 70th Birthdays + 50th Anniversary", targetDate:"2027-08-01",
+      tasks: [] },
+    { id:2, name:"Anniversary Trip Planning", targetDate:"",
+      tasks: [] },
+  ],
+
   // Invoice statuses: "pending" (known/expected, not yet sent) → "sent" (awaiting payment,
   // set overdue:true if it's gone stale) → "paid". Board renders these as three columns.
   // Rebuilt Sept 3 to match the invoicing sheet exactly (Payments Received + Invoices Sent +
@@ -1756,6 +1831,7 @@ function loadIntoState(obj){
   STATE.taxRate = (obj.taxRate !== undefined && obj.taxRate !== null) ? obj.taxRate : STATE.taxRate;
   STATE.businessInfo = obj.businessInfo || STATE.businessInfo;
   STATE.nextInvoiceNumber = (obj.nextInvoiceNumber !== undefined && obj.nextInvoiceNumber !== null) ? obj.nextInvoiceNumber : STATE.nextInvoiceNumber;
+  STATE.personalProjects = obj.personalProjects || STATE.personalProjects;
 
   // One-time migration for data saved before the Invoice Board redesign:
   // old "draft" status → "pending"; old "overdue" status → "sent" + overdue:true;
@@ -2000,6 +2076,86 @@ document.getElementById("saveLogCallBtn").addEventListener("click", ()=>{
   renderMonthlySummary();
   renderReceivablesSummary();
   closeLogCallModal();
+});
+
+/* ---- Add a New Task modal (speak or type, routes to Actions Due or a Personal Project) ---- */
+let taskRecognition = null;
+const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+if(SpeechRecognitionAPI){
+  taskRecognition = new SpeechRecognitionAPI();
+  taskRecognition.continuous = false;
+  taskRecognition.interimResults = false;
+  taskRecognition.lang = "en-US";
+}
+
+function openAddTaskModal(){
+  populateAddTaskTargets();
+  document.getElementById("addTaskText").value = "";
+  document.getElementById("addTaskDays").value = "7";
+  document.getElementById("addTaskError").textContent = "";
+  document.getElementById("addTaskMicNote").textContent = SpeechRecognitionAPI
+    ? ""
+    : "Tap the text box and use your keyboard's dictation mic to speak instead.";
+  document.getElementById("addTaskMicBtn").style.display = SpeechRecognitionAPI ? "" : "none";
+  toggleAddTaskDaysRow();
+  document.getElementById("addTaskModal").classList.add("open");
+}
+function closeAddTaskModal(){
+  document.getElementById("addTaskModal").classList.remove("open");
+  if(taskRecognition){ try{ taskRecognition.stop(); }catch(e){} }
+}
+function toggleAddTaskDaysRow(){
+  const isActions = document.getElementById("addTaskTarget").value === "actions";
+  document.getElementById("addTaskDaysRow").style.display = isActions ? "flex" : "none";
+}
+document.getElementById("addTaskBtn").addEventListener("click", openAddTaskModal);
+document.getElementById("closeAddTaskBtn").addEventListener("click", closeAddTaskModal);
+document.getElementById("cancelAddTaskBtn").addEventListener("click", closeAddTaskModal);
+document.getElementById("addTaskModal").addEventListener("click", (e)=>{
+  if(e.target.id === "addTaskModal") closeAddTaskModal();
+});
+document.getElementById("addTaskTarget").addEventListener("change", toggleAddTaskDaysRow);
+
+document.getElementById("addTaskMicBtn").addEventListener("click", ()=>{
+  if(!taskRecognition) return;
+  const btn = document.getElementById("addTaskMicBtn");
+  const note = document.getElementById("addTaskMicNote");
+  btn.textContent = "⏺";
+  note.textContent = "Listening…";
+  taskRecognition.onresult = (e)=>{
+    const heard = e.results[0][0].transcript;
+    const field = document.getElementById("addTaskText");
+    field.value = field.value ? field.value + " " + heard : heard;
+    note.textContent = "";
+  };
+  taskRecognition.onerror = ()=>{ note.textContent = "Couldn't hear that — try typing instead, or tap the mic to try again."; };
+  taskRecognition.onend = ()=>{ btn.textContent = "🎤"; };
+  try{ taskRecognition.start(); }catch(e){ note.textContent = "Mic already listening — try again in a moment."; }
+});
+
+document.getElementById("saveAddTaskBtn").addEventListener("click", ()=>{
+  const text = document.getElementById("addTaskText").value.trim();
+  const target = document.getElementById("addTaskTarget").value;
+  if(!text){
+    document.getElementById("addTaskError").textContent = "Enter or speak a task first.";
+    return;
+  }
+  if(target === "actions"){
+    const days = Number(document.getElementById("addTaskDays").value) || 7;
+    const nextId = STATE.actions.length ? Math.max(...STATE.actions.map(a=>a.id))+1 : 1;
+    STATE.actions.push({ id:nextId, label:text, client:null, days, done:false });
+    renderActions();
+  } else if(target.startsWith("pp-")){
+    const projectId = Number(target.slice(3));
+    const project = STATE.personalProjects.find(p => p.id === projectId);
+    if(project){
+      const nextTaskId = project.tasks.length ? Math.max(...project.tasks.map(t=>t.id))+1 : 1;
+      project.tasks.push({ id:nextTaskId, text, done:false });
+      renderPersonalProjects();
+    }
+  }
+  markDirty();
+  closeAddTaskModal();
 });
 
 window.addEventListener("beforeunload", (e)=>{
@@ -2827,6 +2983,38 @@ function renderFamilyItems(){
     </div>`).join("");
 }
 
+/* ---------- Personal Projects ---------- */
+function renderPersonalProjects(){
+  const el = document.getElementById("personalProjectsList");
+  const projects = STATE.personalProjects || [];
+  if(projects.length === 0){ el.innerHTML = `<div class="empty-state">No personal projects yet — add one below.</div>`; return; }
+
+  el.innerHTML = projects.map(p => {
+    const openTasks = p.tasks.filter(t => !t.done);
+    const doneTasks = p.tasks.filter(t => t.done);
+    const taskRows = [...openTasks, ...doneTasks].map(t => `
+      <div class="pp-task-row ${t.done ? "done":""}">
+        <div class="check ${t.done ? "checked":""}" data-action="toggle-pp-task" data-project="${p.id}" data-task="${t.id}" style="width:16px; height:16px;"></div>
+        <div class="pp-task-text">${t.text}</div>
+        <button class="icon-btn" data-action="delete-pp-task" data-project="${p.id}" data-task="${t.id}" title="Delete">✕</button>
+      </div>`).join("");
+    return `<div class="pp-card">
+      <div class="pp-head">
+        <span class="pp-name">${p.name}</span>
+        <span style="display:flex; align-items:center; gap:8px;">
+          ${p.targetDate ? `<span class="pp-date">${fmtDate(p.targetDate)}</span>` : ""}
+          <button class="icon-btn" data-action="delete-pp" data-project="${p.id}" title="Delete project">✕</button>
+        </span>
+      </div>
+      ${taskRows || `<div class="empty-state" style="padding:6px 0;">No tasks yet.</div>`}
+      <div class="pp-add-task">
+        <input type="text" placeholder="Add a task…" data-pp-task-input="${p.id}">
+        <button class="btn btn-ghost" data-action="add-pp-task" data-project="${p.id}" style="padding:6px 12px; font-size:12px;">Add</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
 /* ---------- Inline client selects for add-item forms ---------- */
 function populateInlineClientSelects(){
   const opts = STATE.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
@@ -2841,6 +3029,14 @@ function populateInlineClientSelects(){
   const prevVal = summarySel.value;
   summarySel.innerHTML = `<option value="">— Pick a client —</option>` + opts;
   if(prevVal) summarySel.value = prevVal;
+}
+
+function populateAddTaskTargets(){
+  const sel = document.getElementById("addTaskTarget");
+  const prevVal = sel.value;
+  const projectOpts = (STATE.personalProjects || []).map(p => `<option value="pp-${p.id}">${p.name}</option>`).join("");
+  sel.innerHTML = `<option value="actions">Actions Due</option>` + projectOpts;
+  if([...sel.options].some(o => o.value === prevVal)) sel.value = prevVal;
 }
 
 function renderAll(){
@@ -2859,6 +3055,8 @@ function renderAll(){
   renderContacts();
   renderClientRoster();
   renderFamilyItems();
+  renderPersonalProjects();
+  populateAddTaskTargets();
 }
 
 /* =========================================================
@@ -3293,6 +3491,57 @@ document.getElementById("addFamilyBtn").addEventListener("click", ()=>{
   STATE.familyItems.push({ id:nextId, label, location:locInput.value.trim(), locationConflict:false, category:catSel.value, days:Number(daysInput.value)||7, done:false });
   input.value = ""; locInput.value = ""; daysInput.value = "";
   markDirty(); renderFamilyItems();
+});
+
+/* ---- Personal Projects events ---- */
+document.getElementById("addPersonalProjectBtn").addEventListener("click", ()=>{
+  const nameInput = document.getElementById("ppNameInput");
+  const dateInput = document.getElementById("ppDateInput");
+  const name = nameInput.value.trim();
+  if(!name) return;
+  const nextId = STATE.personalProjects.length ? Math.max(...STATE.personalProjects.map(p=>p.id))+1 : 1;
+  STATE.personalProjects.push({ id:nextId, name, targetDate:dateInput.value||"", tasks:[] });
+  nameInput.value = ""; dateInput.value = "";
+  markDirty(); renderPersonalProjects(); populateAddTaskTargets();
+});
+
+document.getElementById("personalProjectsList").addEventListener("click", (e)=>{
+  const addBtn = e.target.closest("[data-action='add-pp-task']");
+  if(addBtn){
+    const projectId = Number(addBtn.dataset.project);
+    const input = document.querySelector(`[data-pp-task-input="${projectId}"]`);
+    const text = input.value.trim();
+    if(!text) return;
+    const project = STATE.personalProjects.find(p=>p.id===projectId);
+    const nextTaskId = project.tasks.length ? Math.max(...project.tasks.map(t=>t.id))+1 : 1;
+    project.tasks.push({ id:nextTaskId, text, done:false });
+    input.value = "";
+    markDirty(); renderPersonalProjects();
+    return;
+  }
+  const toggle = e.target.closest("[data-action='toggle-pp-task']");
+  if(toggle){
+    const project = STATE.personalProjects.find(p=>p.id===Number(toggle.dataset.project));
+    const task = project && project.tasks.find(t=>t.id===Number(toggle.dataset.task));
+    if(task){ task.done = !task.done; markDirty(); renderPersonalProjects(); }
+    return;
+  }
+  const delTask = e.target.closest("[data-action='delete-pp-task']");
+  if(delTask){
+    const project = STATE.personalProjects.find(p=>p.id===Number(delTask.dataset.project));
+    if(project){ project.tasks = project.tasks.filter(t=>t.id!==Number(delTask.dataset.task)); markDirty(); renderPersonalProjects(); }
+    return;
+  }
+  const delProject = e.target.closest("[data-action='delete-pp']");
+  if(delProject){
+    STATE.personalProjects = STATE.personalProjects.filter(p=>p.id!==Number(delProject.dataset.project));
+    markDirty(); renderPersonalProjects(); populateAddTaskTargets();
+  }
+});
+document.getElementById("personalProjectsList").addEventListener("keydown", (e)=>{
+  if(e.key === "Enter" && e.target.matches("[data-pp-task-input]")){
+    e.target.nextElementSibling.click();
+  }
 });
 
 /* ---- Page navigation ---- */
