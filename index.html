@@ -1929,6 +1929,67 @@ function loadIntoState(obj){
     return;
   }
 
+  // One-time additive Family & School Watch items: Picture Day (Sept 10, found on the
+  // calendar), and "watch for coaches' emails" re: more soccer tryouts this week — both
+  // added proactively per your standing rule that this section doesn't need a stated
+  // commitment first. Only adds if not already present.
+  const CURRENT_FAMILY_FIX_VERSION = 2;
+  if(!obj.familyFixVersion || obj.familyFixVersion < CURRENT_FAMILY_FIX_VERSION){
+    let nextId = STATE.familyItems.length ? Math.max(...STATE.familyItems.map(f=>f.id))+1 : 1;
+    if(!STATE.familyItems.some(f => f.label === "Picture Day")){
+      STATE.familyItems.push({ id:nextId++, label:"Picture Day", category:"School", days:3, done:false });
+    }
+    if(!STATE.familyItems.some(f => f.label.startsWith("Watch for coaches"))){
+      STATE.familyItems.push({ id:nextId++, label:"Watch for coaches' emails — more soccer tryouts this week", category:"Soccer", days:5, done:false });
+    }
+    STATE.familyFixVersion = CURRENT_FAMILY_FIX_VERSION;
+    renderAll();
+    suppressDirty = false;
+    markDirty();
+    return;
+  }
+
+  // One-time additive Family & School Watch update (Sept 8 review — soccer/flag football
+  // focus): resolves the earlier "watch for coaches' emails" placeholder now that real
+  // schedules came in, and adds the specific new items found. Only adds/marks-done what
+  // isn't already there — never touches anything you've since edited yourself.
+  const CURRENT_FAMILY_FIX_VERSION_2 = 1;
+  if(!obj.familyFixVersion2 || obj.familyFixVersion2 < CURRENT_FAMILY_FIX_VERSION_2){
+    const placeholder = STATE.familyItems.find(f => f.label.startsWith("Watch for coaches"));
+    if(placeholder) placeholder.done = true;
+
+    let nextId2 = STATE.familyItems.length ? Math.max(...STATE.familyItems.map(f=>f.id))+1 : 1;
+    const addIfNew = (label, category, days, location) => {
+      if(!STATE.familyItems.some(f => f.label === label)){
+        const item = { id:nextId2++, label, category, days, done:false };
+        if(location) item.location = location;
+        STATE.familyItems.push(item);
+      }
+    };
+    addIfNew(
+      "Soccer: Thursday tryout conflicts with Riv's chiro appt — you noted \"keep chiro appt, skip Thu tryout unless another time available\"",
+      "Soccer", 2
+    );
+    addIfNew(
+      "Flag Football: First practice Fri Sept 11, 5-6:15pm — Coach Jonathan Pritchett (\"Rams\"), regular Friday practices going forward",
+      "Flag Football", 3, "Field behind St. Anne's Church, King Street"
+    );
+    addIfNew(
+      "Flag Football: Mouthguard required this week — NFL policy, can't play without one",
+      "Flag Football", 3
+    );
+    addIfNew(
+      "Flag Football: Games start Sat Sept 19, 1:30-2:30pm (arrive 1pm) — recurring Saturdays through Nov 14 championship. Oct 3 game is ALSO team picture day.",
+      "Flag Football", 11
+    );
+
+    STATE.familyFixVersion2 = CURRENT_FAMILY_FIX_VERSION_2;
+    renderAll();
+    suppressDirty = false;
+    markDirty();
+    return;
+  }
+
   renderAll();
   suppressDirty = false;
 }
