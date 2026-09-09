@@ -1098,6 +1098,14 @@ const PREP_STYLES = {
 // added/moved/removed directly without waiting on a refresh. Standing rule: never attach
 // a "prep" field to any block — no auto-generated meeting prep of any kind, only if asked.
 //
+// Standing rule (added per user request, Sept 9): when asked to "run a search" or "review"
+// email/calendar for this dashboard, default to broad — look for ANYTHING that could
+// surface as a dashboard-relevant change (client updates, payment confirmations, family/
+// school changes, scheduling conflicts), not just whatever topic happens to be mentioned in
+// the same message. A narrowly-keyword-scoped search (e.g. only "soccer OR flag football")
+// missed a client pausing coaching because her email didn't contain either term — the fix
+// isn't reading more folders, it's not pre-narrowing the query based on assumed topic.
+//
 // Standing rule (added per user request): once school/soccer/flag football are underway,
 // automatically pull drop-off, practice, and game times into Today's blocks on every
 // refresh, same as client sessions — no need to ask each time. As of Aug 28, confirmed
@@ -1984,6 +1992,23 @@ function loadIntoState(obj){
     );
 
     STATE.familyFixVersion2 = CURRENT_FAMILY_FIX_VERSION_2;
+    renderAll();
+    suppressDirty = false;
+    markDirty();
+    return;
+  }
+
+  // One-time targeted client note (Sept 9): Lisa Sanders paused coaching (email Sept 8 —
+  // "pause until I pick up another client... daughter's wedding draining the bank account").
+  // Only appends the note to her meta field if not already there — never touches billing
+  // terms, prepay hours, or anything you may have edited yourself since.
+  const CURRENT_CLIENT_NOTE_VERSION = 1;
+  if(!obj.clientNoteVersion || obj.clientNoteVersion < CURRENT_CLIENT_NOTE_VERSION){
+    const lisaS = STATE.clients.find(c => c.id === "lisa-s");
+    if(lisaS && !lisaS.meta.includes("PAUSED")){
+      lisaS.meta = lisaS.meta + " · PAUSED as of 9/8 — pausing until she picks up another client";
+    }
+    STATE.clientNoteVersion = CURRENT_CLIENT_NOTE_VERSION;
     renderAll();
     suppressDirty = false;
     markDirty();
