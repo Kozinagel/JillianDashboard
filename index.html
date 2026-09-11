@@ -2591,11 +2591,15 @@ function renderInvoiceBoard(){
 
   Object.entries(buckets).forEach(([status, list]) => {
     const sorted = [...list].sort((a,b) => (b.sentDate||"").localeCompare(a.sentDate||""));
-    const feeList = list.filter(i => i.kind !== "reimbursement" && i.amount !== "" && i.amount != null);
+    // Excludes self-pay/Venmo clients and anything separately tracked (Sakata), matching the
+    // Invoicing Cycle summary tiles above — otherwise the two totals silently disagree.
+    const feeList = list.filter(i => i.kind !== "reimbursement" && i.amount !== "" && i.amount != null && !isExcludedFromRevenue(i.client));
     const sum = feeList.reduce((s,i) => s + Number(i.amount), 0);
+    const excludedCount = list.length - feeList.length;
 
     document.getElementById("bc-count-" + status).textContent = list.length;
-    document.getElementById("bc-sum-" + status).textContent = "$" + sum.toLocaleString(undefined,{maximumFractionDigits:0});
+    document.getElementById("bc-sum-" + status).textContent = "$" + sum.toLocaleString(undefined,{maximumFractionDigits:0})
+      + (excludedCount > 0 ? ` (excl. ${excludedCount} self-pay/separate)` : "");
 
     const body = document.getElementById("board-col-" + status);
     body.innerHTML = sorted.length === 0 ? `<div class="board-empty">Nothing here</div>` : sorted.map(inv => {
