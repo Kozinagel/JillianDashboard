@@ -2974,7 +2974,8 @@ function renderInvoiceChecklist(){
 
   const recurring = STATE.clients.filter(c => {
     const bt = STATE.billingTerms[c.id];
-    return bt && (bt.type === "hourly" || bt.type === "project") && !bt.selfPay;
+    // One-time projects billed outside the recurring cycle (e.g. Carve AI - Sakata, offsite complete) are not "behind".
+    return bt && (bt.type === "hourly" || bt.type === "project") && !bt.selfPay && !bt.excludeFromRevenue;
   });
 
   const needsInvoice = recurring.map(c => {
