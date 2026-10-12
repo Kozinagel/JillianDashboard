@@ -1166,6 +1166,7 @@ let STATE = {
     { id:"nova",     name:"Nova CoS Trainings", meta:"Two engagements: (1) Training delivery (virtual cohorts $1K/day, in-person $2K/day + $2K travel stipend) — Nova auto-tracks and pays, no invoicing needed, just reconciliation. (2) Course content updates (Kajabi), billable $100/hr — currently stalled, Jillian is the blocker.",
       engagements:["hrld","offsite"], prepStyle:"adhoc" },
     { id:"brittany", name:"Brittany Soler", meta:"Hylant · monthly coaching", engagements:["coaching"], prepStyle:"none" },
+    { id:"agribank", name:"Tali Briggs (AgriBank)", meta:"Executive Business Partner, Office of the CEO · transitioning to Chief of Staff · $375/hr, 10-hr prepay ($3,750) · services agreement with CEO approval / vendor management as of 10/12", engagements:["coaching"], prepStyle:"none" },
     { id:"lisa-s",   name:"Lisa Sanders", meta:"LRS Executive Solutions · biweekly coaching", engagements:["coaching"], prepStyle:"none" },
     { id:"courtney", name:"Courtney Vincent", meta:"Self-pay · biweekly coaching", engagements:["coaching"], prepStyle:"none" },
     { id:"lisa-c",   name:"Lisa Collins", meta:"Self-pay · biweekly coaching", engagements:["coaching"], prepStyle:"none" },
@@ -1208,6 +1209,7 @@ let STATE = {
   },
 
   billingTerms: {
+    "agribank": { type:"prepay", prepayHours:10, prepayRate:375, prepayHoursUsed:0 },
     glyphic:   { type:"hourly", hourlyRate:333 },
     "sgh-hr":  { type:"hourly", hourlyRate:350 },
     "sgh-admin": { type:"hourly", hourlyRate:350 },
@@ -1392,7 +1394,7 @@ let STATE = {
   // Invoice statuses: "pending" (known/expected, not yet sent) → "sent" (awaiting payment,
   // set overdue:true if it's gone stale) → "paid". Board renders these as three columns.
   // Rebuilt Sept 3 to match the invoicing sheet exactly (Payments Received + Invoices Sent +
-  // Invoices Pending tables) — every real line item logged individually.
+  // Invoices Pending tables) — every real line item logged individually. Re-synced Oct 12.
   invoices: [
     // ---- Payments Received (28 items, sheet total $90,929.25) ----
     { id:1, client:"radar", desc:"Prepay 10 hours July+", amount:3750, status:"paid", sentDate:"2026-07-13", dueDate:"", kind:"fee" },
@@ -1425,9 +1427,9 @@ let STATE = {
     { id:28, client:"radar", desc:"Pre-pay 10 hrs", amount:3750, status:"paid", sentDate:"2026-01-06", dueDate:"", kind:"fee" },
 
     // ---- Invoices Sent (5 items, sheet total $11,494.00) ----
-    { id:29, client:"glyphic", desc:"Aug hours", amount:2747.25, status:"sent", sentDate:"2026-09-01", dueDate:"", kind:"fee" },
+    { id:29, client:"glyphic", desc:"Aug hours", amount:2747.25, status:"paid", sentDate:"2026-09-01", dueDate:"", kind:"fee" },
     { id:30, client:"sgh-admin", desc:"July & Aug hours", amount:700, status:"sent", sentDate:"2026-09-01", dueDate:"", kind:"fee" },
-    { id:31, client:"sgh-hr", desc:"July hours", amount:1050, status:"sent", sentDate:"2026-08-24", dueDate:"", kind:"fee" },
+    { id:31, client:"sgh-hr", desc:"July hours", amount:1050, status:"paid", sentDate:"2026-08-24", dueDate:"", kind:"fee" },
     { id:32, client:"radar", desc:"Prepay 10 hours Aug+ — sheet shows Sent; you separately told me it cleared via ACH 8/28, but reverted this to match the sheet exactly per your request", amount:3750, status:"sent", sentDate:"2026-08-24", dueDate:"", kind:"fee" },
     { id:33, client:"glyphic", desc:"July hours (sent 8/7, paid via ACH per Ramp payment notification)", amount:3246.75, status:"paid", sentDate:"2026-09-04", dueDate:"", kind:"fee" },
 
@@ -1439,14 +1441,16 @@ let STATE = {
     { id:38, client:"nova", desc:"Oct 3-day virtual (Nov invoice)", amount:3000, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
     { id:39, client:"sgh-admin", desc:"Nov (projected)", amount:1000, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
     { id:40, client:"sgh-hr", desc:"Nov (projected)", amount:700, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
-    { id:41, client:"glyphic", desc:"Nov (projected)", amount:3000, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
-    { id:42, client:"sgh-admin", desc:"Oct (projected)", amount:1000, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
-    { id:43, client:"sgh-hr", desc:"Oct (projected)", amount:700, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
-    { id:44, client:"glyphic", desc:"Oct (projected)", amount:3000, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
-    { id:45, client:"generate", desc:"Pre-pay next 20 hours (Oct)", amount:7500, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
-    { id:46, client:"nova", desc:"Sept — $6K teaching + $2K expenses (expenses not revenue, kept as one line to match sheet total)", amount:8000, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
-    { id:47, client:"sgh-hr", desc:"Aug hours (Sept invoice)", amount:700, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
-    { id:48, client:"nova", desc:"Course updates June (4) & July (TBD)", amount:800, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
+    { id:41, client:"glyphic", desc:"Oct hours (Nov invoice)", amount:2997, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
+    { id:45, client:"generate", desc:"Pre pay next 20 hours (Nov)", amount:7500, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
+    { id:46, client:"nova", desc:"Sept — $6K teaching + $2K expenses (expenses not revenue, kept as one line to match sheet total)", amount:8000, status:"sent", sentDate:"", dueDate:"", kind:"fee" },
+    { id:48, client:"nova", desc:"Course updates June (4) & July (4) at $100/hr (sheet shows $0.00 until invoiced)", amount:0, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
+
+    // ---- Added Oct 12 from the updated sheet ----
+    { id:53, client:"sgh-admin", desc:"Sept hours", amount:700, status:"sent", sentDate:"2026-10-12", dueDate:"", kind:"fee" },
+    { id:54, client:"sgh-hr", desc:"Aug & Sept hours", amount:2450, status:"sent", sentDate:"2026-10-12", dueDate:"", kind:"fee" },
+    { id:55, client:"glyphic", desc:"Sept hours", amount:1831.50, status:"sent", sentDate:"2026-10-02", dueDate:"", kind:"fee" },
+    { id:56, client:"agribank", desc:"Prepay 10 hours (Oct)", amount:3750, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
 
     // ---- Self-pay (Venmo, excluded from revenue/tax — tracked in Self-Pay dashboard) ----
     { id:49, client:"lisa-s", desc:"Coaching session (Venmo)", amount:200, status:"paid", sentDate:"2026-08-18", dueDate:"", kind:"fee" },
@@ -1454,7 +1458,7 @@ let STATE = {
 
     // ---- Carve AI - Sakata (separate from the Invoices Pending table above, tracked elsewhere on the sheet) ----
     { id:51, client:"sakata", desc:"50% deposit — paid (amount is a $6,500 estimate, half of $13K project total — confirm actual figure)", amount:6500, status:"paid", sentDate:"2026-08-16", dueDate:"", kind:"fee" },
-    { id:52, client:"sakata", desc:"Final invoice + expenses (lumped per Fiona's Aug 25 agreement) — final balance $7,000.00 + expenses $2,578.78", amount:9578.78, status:"pending", sentDate:"", dueDate:"", kind:"fee" },
+    { id:52, client:"sakata", desc:"PAID (marked in app) · Final invoice + expenses (lumped per Fiona's Aug 25 agreement) — final balance $7,000.00 + expenses $2,578.78", amount:9578.78, status:"paid", sentDate:"", dueDate:"", kind:"fee" },
   ],
 
   // Standing rule (added per user request): when scanning email for a refresh, actively
@@ -1825,6 +1829,9 @@ async function syncToFirestore(){
 
 function loadIntoState(obj){
   suppressDirty = true;
+  // Carry migration flags forward so a later save never drops them (otherwise a finished
+  // one-time fix could re-run on the next load).
+  Object.keys(obj).forEach(k => { if(/Version2?$/.test(k) && typeof obj[k]==="number") STATE[k] = obj[k]; });
   STATE.todayLabel = obj.todayLabel || STATE.todayLabel;
   STATE.todayBlocks = obj.todayBlocks || STATE.todayBlocks;
   STATE.clients = obj.clients || STATE.clients;
@@ -2009,6 +2016,101 @@ function loadIntoState(obj){
       lisaS.meta = lisaS.meta + " · PAUSED as of 9/8 — pausing until she picks up another client";
     }
     STATE.clientNoteVersion = CURRENT_CLIENT_NOTE_VERSION;
+    renderAll();
+    suppressDirty = false;
+    markDirty();
+    return;
+  }
+
+  // One-time targeted sync (Oct 12): brings invoices, roster notes and contacts in line with the
+  // updated 2026 sheet. Every step matches specific items and is idempotent; it never replaces
+  // arrays wholesale, so anything you changed in the app since stays as-is.
+  const CURRENT_SYNC_OCT12_VERSION = 1;
+  if(!obj.syncOct12Version || obj.syncOct12Version < CURRENT_SYNC_OCT12_VERSION){
+    const near = (a,b) => Math.abs(Number(a)-b) < 0.005;
+    const firstOf = (client, amount, prefix) => STATE.invoices.find(i => i.client===client && near(i.amount,amount) && (i.desc||"").startsWith(prefix));
+    let nid = STATE.invoices.length ? Math.max(...STATE.invoices.map(i=>i.id))+1 : 1;
+
+    // Payments now received per the sheet
+    const g = firstOf("glyphic",2747.25,"Aug hours");
+    if(g && g.status !== "paid"){ g.status = "paid"; }
+    const sh = firstOf("sgh-hr",1050,"July hours");
+    if(sh && sh.status !== "paid"){ sh.status = "paid"; }
+
+    // Nova Sept invoice is Sent on the sheet
+    const nv = firstOf("nova",8000,"Sept");
+    if(nv && nv.status === "pending"){ nv.status = "sent"; }
+
+    // Projected rows that were invoiced or replaced
+    const dropIfPending = (client, amount, prefix) => {
+      STATE.invoices = STATE.invoices.filter(i => !(i.client===client && near(i.amount,amount) && (i.desc||"").startsWith(prefix) && i.status==="pending"));
+    };
+    dropIfPending("sgh-admin",1000,"Oct (projected)");
+    dropIfPending("sgh-hr",700,"Oct (projected)");
+    dropIfPending("glyphic",3000,"Oct (projected)");
+    dropIfPending("sgh-hr",700,"Aug hours (Sept invoice)");
+
+    // Pending rows whose figures changed on the sheet
+    const gn = firstOf("glyphic",3000,"Nov (projected)");
+    if(gn && gn.status==="pending"){ gn.amount = 2997; gn.desc = "Oct hours (Nov invoice)"; }
+    const cb = firstOf("generate",7500,"Pre-pay next 20 hours (Oct)");
+    if(cb && cb.status==="pending"){ cb.desc = "Pre pay next 20 hours (Nov)"; }
+    const cu = firstOf("nova",800,"Course updates");
+    if(cu && cu.status==="pending"){ cu.amount = 0; cu.desc = "Course updates June (4) & July (4) at $100/hr (sheet shows $0.00 until invoiced)"; }
+
+    // New invoices on the sheet
+    const addInv = (client, desc, amount, status, sentDate) => {
+      if(!STATE.invoices.some(i => i.client===client && near(i.amount,amount) && (i.desc||"").startsWith(desc))){
+        STATE.invoices.push({ id:nid++, client, desc, amount, status, sentDate:sentDate||"", dueDate:"", kind:"fee" });
+      }
+    };
+    addInv("sgh-admin","Sept hours",700,"sent","2026-10-12");
+    addInv("sgh-hr","Aug & Sept hours",2450,"sent","2026-10-12");
+    addInv("glyphic","Sept hours",1831.50,"sent","2026-10-02");
+    addInv("agribank","Prepay 10 hours (Oct)",3750,"pending","");
+
+    // Roster: Tali Briggs / AgriBank
+    if(!STATE.clients.some(c => c.id==="agribank")){
+      STATE.clients.push({ id:"agribank", name:"Tali Briggs (AgriBank)", meta:"Executive Business Partner, Office of the CEO · transitioning to Chief of Staff · $375/hr, 10-hr prepay ($3,750) · services agreement with CEO approval / vendor management as of 10/12", engagements:["coaching"], prepStyle:"none" });
+    }
+    if(!STATE.billingTerms["agribank"]){
+      STATE.billingTerms["agribank"] = { type:"prepay", prepayHours:10, prepayRate:375, prepayHoursUsed:0 };
+    }
+    // Roster status notes from the client sheet (appended only once)
+    const note = (id, marker, text) => {
+      const c = STATE.clients.find(x => x.id===id);
+      if(c && !(c.meta||"").includes(marker)){ c.meta = (c.meta||"") + text; }
+    };
+    note("regina","PAUSED"," · PAUSED per client sheet");
+    note("sakata","Offsite completed"," · Offsite completed per client sheet");
+    note("generate","Ola paused"," · Ola paused per client sheet (Daniel active)");
+    note("fundomo","Corey & Siranush paused"," · Corey & Siranush paused per client sheet (Anaida active)");
+    note("courtney","Limelight"," · now Head of People at Limelight Steel (per 9/25 email)");
+
+    // Contacts: people you have been reconnecting with, plus intake leads from the sheet
+    const newContacts = [
+      { name:"Mia Lane", context:"UKG · Sr. Executive Assistant (supports a GVP, Engineering) · reconnected via your Oct 7 'Thinking of you' email · virtual catch-up set Mon Oct 26, 1:00-1:45pm ET", category:"" },
+      { name:"Sam Johnston", context:"Reconnected Oct 7-12 · just got married and started a new job Oct 12 · you asked for a wedding pic", category:"" },
+      { name:"Michael Goldenberg", context:"Friend · 2024 happy hour and boat ride · reconnected Oct 7 after a long gap", category:"Friend" },
+      { name:"Ambrosia", context:"ambrosia@vertesi.com · you wrote Oct 9 that you'd lost touch · no reply yet", category:"" },
+      { name:"Lindsay Flood", context:"RepareRx · paused client on your sheet · about a year into time off · reconnect call Tue Oct 13, 11am ET", category:"" },
+      { name:"Sunny Nunan", context:"The Admin Awards · Boston gala board and sponsor thank-you thread (Oct 7)", category:"Charity" },
+      { name:"Kelly Cheng", context:"Former Goldcast contact (name matched to your sheet) · you sent a 'Thinking of you' email Oct 7 · no reply yet", category:"" },
+      { name:"Lauren Creedon", context:"Former Goldcast contact (name matched to your sheet) · you sent a 'Thinking of you' email Oct 7 · no reply yet", category:"" },
+      { name:"Grace Simpson", context:"Generate Capital · paused client on your sheet · you sent a 'Thinking of you' email Oct 7 · no reply yet", category:"" },
+      { name:"Destiny Miller", context:"Former Edgio / CourseHero client (name matched to your sheet) · you sent a 'Thinking of you' email Oct 7 · no reply yet", category:"" },
+      { name:"Sam Zaloof", context:"Atomic Semi · intake lead on your client sheet, referred via Fundomo · possible coaching or project-based work", category:"Prospect" },
+      { name:"Nora Carroll", context:"Meehan Boyle · intake lead on your client sheet, referred by Lindsay F · listed as 'possible offsite 2025', so likely stale", category:"Prospect" },
+    ];
+    const have = new Set(STATE.contacts.map(c => (c.name||"").toLowerCase()));
+    let cid = STATE.contacts.length ? Math.max(...STATE.contacts.map(c=>c.id))+1 : 1;
+    newContacts.forEach(nc => {
+      if(!have.has(nc.name.toLowerCase())){
+        STATE.contacts.push({ id:cid++, name:nc.name, context:nc.context, actionItem:"", category:nc.category });
+      }
+    });
+
+    STATE.syncOct12Version = CURRENT_SYNC_OCT12_VERSION;
     renderAll();
     suppressDirty = false;
     markDirty();
