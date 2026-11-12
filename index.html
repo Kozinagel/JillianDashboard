@@ -1193,18 +1193,16 @@ let STATE = {
 
   lookAhead: {
     "30": [
-      { id:1, client:"nova", title:"APC Conference — Nashville (in-person)", note:"Flight BOS→BNA Sept 11 (1:40-4:28pm), Gaylord Opryland Sept 11-17, Nova Team Breakfast Sept 12 9am CT, Day-0 dry runs Sept 12, Nova Days 1–3 Sept 13–15, fly home Sept 16. Slide deck finalized with Krysta (Aug 25).", needsPrepNow:true },
-      { id:2, client:"sakata", title:"Confirm next steps after EAD workshop", note:"No further offsite currently on the calendar — worth a renewal/next-phase conversation", needsPrepNow:false },
-      { id:3, client:"radar", title:"Coaching hours renewal check-in", note:"Sophia has paused her own 1:1s for now — Parham's sessions continuing.", needsPrepNow:false },
-      { id:8, client:null, title:"River's school year starts", note:"8th grade starts Sept 1. Recurring drop-off (7:30-8:05am weekdays) and pickup (2:15-2:45pm, from Sept 7) now on calendar. Soccer tryouts Sept 1-3, Travel Soccer practice T/Th 5:30-7:30pm from Sept 1, games Saturdays 4:30pm from Sept 12.", needsPrepNow:false },
+      { id:301, client:"glyphic", date:"2026-11-17", title:"Helen (Glyphic) weekly coaching begins", note:"Tue Nov 17, 2pm; weekly on Tuesdays", needsPrepNow:false },
+      { id:302, client:null, date:"2026-12-04", title:"Chief of Staff Roundtable: Advisory Board meeting", note:"Fri Dec 4, 10am", needsPrepNow:false },
+      { id:303, client:null, date:"2026-12-09", title:"Podcast interview with Jeremy Burrows", note:"Wed Dec 9, 11am; headshot still to send", needsPrepNow:false },
+      { id:304, client:"generate", date:"2026-12-11", title:"Ola end-of-year check-in (Constructive Bio)", note:"Target early to mid Dec; not yet scheduled", needsPrepNow:false },
     ],
     "60": [
-      { id:4, client:"generate", title:"OKRs Q3 review", note:"Sept 28 · full-cycle OKR review session, Constructive Bio", needsPrepNow:false },
-      { id:7, client:"nova", title:"October Virtual Cohort (OVC)", note:"3-day virtual training, Oct 6-8 · schedule circulating from Krysta, prep call still to be set", needsPrepNow:false },
+      { id:305, client:"generate", date:"2026-12-14", title:"OKRs Q4 review and wrap-up", note:"Mon Dec 14, 10:30am", needsPrepNow:false },
     ],
     "90": [
-      { id:5, client:"nova", title:"EAIF Conference — Nashville (in-person)", note:"Nov 2-4 · prep call already on calendar for Oct 22", needsPrepNow:false },
-      { id:6, client:"generate", title:"OKRs mid-cycle check-in", note:"Nov 9 · next mid-cycle OKR touchpoint, Constructive Bio", needsPrepNow:false },
+      { id:306, client:null, date:"2027-01-21", title:"Admin Awards Institute: performance-review prep session", note:"Thu Jan 21 (from Admin Awards email; not yet on calendar)", needsPrepNow:false },
     ],
   },
 
@@ -1530,9 +1528,24 @@ let STATE = {
   // cross-checking. Each family item below can carry a `location` field, shown as its own line
   // with a 📍 icon (or ⚠ if locationConflict is true).
   familyItems: [
-    { id:1, label:"Confirm River's class schedule posted in Aspen — Jason said ~2pm Aug 28", category:"School", days:1, done:true },
-    { id:2, label:"Flag Football Combine / Skills Night — Wed Sept 2, 5-7:45pm", location:"Couper Field, 35 Shaker Lane (confirmed by rec dept email — calendar incorrectly said Russell Street track)", locationConflict:false, category:"Flag Football", days:5, done:true },
-    { id:4, label:"MS Back to School Night — Mon Sept 14 (Littleton district calendar)", category:"School", days:17, done:false },
+    { id:301, date:"2026-11-13", label:"Oliver's birthday at the Point, 2:30-5:30pm (Erin picks up the kids at school)", category:"Family", days:0, done:false },
+    { id:302, date:"2026-11-13", label:"EVENING, DRIVING: Alok Vaid-Menon, 8pm at 3S Artspace, Portsmouth NH. About 1 hour each way with no traffic: leave by 6pm, tacos at 7pm. Expect a late return", category:"Evening Drive", location:"3S Artspace, Portsmouth NH", locationConflict:false, days:0, done:false },
+    { id:303, date:"2026-11-17", label:"EVENING, DRIVING: Dinner with Josh in Lexington, 7pm. Calendar holds TWO reservations at the same time (Post 1917 Steakhouse and Town Meeting Bistro): cancel one. Eerik coaching ends 5:45pm, so allow travel time", category:"Evening Drive", location:"Town Meeting Bistro, Lexington (or Post 1917)", locationConflict:false, days:0, done:false },
+    { id:304, date:"2026-11-18", label:"River: Ortho, 9am", category:"Appointment", location:"133 Littleton Rd, suite 104", locationConflict:false, days:0, done:false },
+    { id:305, date:"2026-11-19", label:"EVENING: Erik's birthday and sleepover, 5-9pm (location not on calendar: confirm drop-off and pick-up). Your Josh call at 7:30pm is virtual", category:"Evening Drive", days:0, done:false },
+    { id:306, date:"2026-11-20", label:"No school: full-day conference (district calendar)", category:"School", days:0, done:false },
+    { id:307, date:"2026-11-24", label:"EVENING, DRIVING: Dinner at Tavern in the Square, Andover, 7-8:30pm. Estimate 30 to 40 minutes each way: leave by 6:15pm", category:"Evening Drive", location:"Tavern in the Square, Andover", locationConflict:false, days:0, done:false },
+    { id:308, date:"2026-11-25", label:"Early release before Thanksgiving break", category:"School", days:0, done:false },
+    { id:309, date:"2026-11-26", label:"Thanksgiving break: no school Nov 26-27", category:"School", days:0, done:false },
+    { id:310, date:"2026-12-02", label:"River: Ortho, 10:15am", category:"Appointment", location:"133 Littleton Rd, suite 104", locationConflict:false, days:0, done:false },
+    { id:311, date:"2026-12-09", label:"Early release (district calendar)", category:"School", days:0, done:false },
+    { id:312, date:"2026-12-12", label:"EVENING: Holiday Open House, 3:15-8pm (location not on calendar: confirm address and drive time)", category:"Evening Drive", days:0, done:false },
+    { id:313, date:"2026-12-24", label:"River: physical with Carmen, 10am. School break runs Dec 24 to Jan 1", category:"Appointment", days:0, done:false },
+    { id:314, date:"2027-01-06", label:"River: Ortho, 3:30pm", category:"Appointment", location:"133 Littleton Rd, suite 104", locationConflict:false, days:0, done:false },
+    { id:315, date:"2027-01-13", label:"Early release (district calendar)", category:"School", days:0, done:false },
+    { id:316, date:"2027-01-18", label:"No school: Martin Luther King Jr. Day", category:"School", days:0, done:false },
+    { id:317, date:"2027-05-01", label:"Parents return from Florida (away until May)", category:"Family", days:0, done:false },
+    { id:318, date:"2027-08-21", label:"Party, Aug 21: parents secured the caterer; live music is booked (Chris Hayes, rain date Sunday held). Deposit for the band still to send", category:"Family", days:0, done:false },
   ],
 };
 
@@ -1542,6 +1555,8 @@ let STATE = {
 const SEED_INVOICES = JSON.parse(JSON.stringify(STATE.invoices));
 const SEED_BILLING_TERMS = JSON.parse(JSON.stringify(STATE.billingTerms));
 const SEED_HOURS_LOG = JSON.parse(JSON.stringify(STATE.hoursLog));
+const SEED_LOOKAHEAD = JSON.parse(JSON.stringify(STATE.lookAhead));
+const SEED_FAMILY = JSON.parse(JSON.stringify(STATE.familyItems));
 
 function clientById(id){ return STATE.clients.find(c => c.id === id); }
 
@@ -2025,6 +2040,7 @@ function loadIntoState(obj){
   // One-time targeted sync (Oct 12): brings invoices, roster notes and contacts in line with the
   // updated 2026 sheet. Every step matches specific items and is idempotent; it never replaces
   // arrays wholesale, so anything you changed in the app since stays as-is.
+  let migratedOct12 = false;
   const CURRENT_SYNC_OCT12_VERSION = 1;
   if(!obj.syncOct12Version || obj.syncOct12Version < CURRENT_SYNC_OCT12_VERSION){
     const near = (a,b) => Math.abs(Number(a)-b) < 0.005;
@@ -2111,6 +2127,100 @@ function loadIntoState(obj){
     });
 
     STATE.syncOct12Version = CURRENT_SYNC_OCT12_VERSION;
+    migratedOct12 = true;
+  }
+
+  // One-time refresh (Oct 12, part 2): Look Ahead and Family & School Watch replaced with current items
+  // from the calendar and school emails. Items you added by hand to Look Ahead are kept; undated legacy
+  // Family items (all September leftovers) are dropped. From here on, items carry dates and age out on their own.
+  const CURRENT_SYNC_OCT12B_VERSION = 1;
+  if(!obj.syncOct12bVersion || obj.syncOct12bVersion < CURRENT_SYNC_OCT12B_VERSION){
+    const manual = [];
+    ["30","60","90"].forEach(b => (STATE.lookAhead[b]||[]).forEach(it => { if(it.note === "Added manually") manual.push({bucket:b, it}); }));
+    const la = JSON.parse(JSON.stringify(SEED_LOOKAHEAD));
+    let lid = 200;
+    manual.forEach(m => { la[m.bucket].push(Object.assign({}, m.it, { id: lid++ })); });
+    STATE.lookAhead = la;
+    const seedLabels = new Set(SEED_FAMILY.map(f => f.label));
+    const keep = (STATE.familyItems||[]).filter(f => f.date && !seedLabels.has(f.label));
+    STATE.familyItems = JSON.parse(JSON.stringify(SEED_FAMILY)).concat(keep);
+    STATE.syncOct12bVersion = CURRENT_SYNC_OCT12B_VERSION;
+    migratedOct12 = true;
+  }
+
+  // One-time sync (Nov 12): Look Ahead trimmed to Big items, Family & School Watch refreshed (no sports),
+  // invoices matched to the 11/10 sheet, Tali / Helen / Andrew / Elizabeth roster updates.
+  // Every step is idempotent. Manual Look Ahead items and manually added dated Family items are kept.
+  const CURRENT_SYNC_NOV12_VERSION = 1;
+  if(!obj.syncNov12Version || obj.syncNov12Version < CURRENT_SYNC_NOV12_VERSION){
+    const manual = [];
+    ["30","60","90"].forEach(b => (STATE.lookAhead[b]||[]).forEach(it => { if(it.note === "Added manually") manual.push({bucket:b, it}); }));
+    const la = JSON.parse(JSON.stringify(SEED_LOOKAHEAD));
+    let lid = 400;
+    manual.forEach(m => { la[m.bucket].push(Object.assign({}, m.it, { id: lid++ })); });
+    STATE.lookAhead = la;
+    const seedLabels2 = new Set(SEED_FAMILY.map(f => f.label));
+    const oldSeedLabels = /Flag Football|Travel Soccer|Night at the Revs|Nashville travel|Oliver's birthday hold|Forge Pond|Picture Day|coaches/i;
+    const kept2 = (STATE.familyItems||[]).filter(f => f.date && !seedLabels2.has(f.label) && !oldSeedLabels.test(f.label) && !(f.id>=101 && f.id<=118) && !(f.id>=301 && f.id<=318));
+    let fid2 = 400;
+    const ids = kept2.map(f => Object.assign({}, f, { id: fid2++ }));
+    STATE.familyItems = JSON.parse(JSON.stringify(SEED_FAMILY)).concat(ids);
+
+    const near = (a,b) => Math.abs(Number(a)-b) < 0.005;
+    const find = (client, amount, prefix) => STATE.invoices.find(i => i.client===client && near(i.amount,amount) && (i.desc||"").startsWith(prefix));
+    let nid = STATE.invoices.length ? Math.max(...STATE.invoices.map(i=>i.id))+1 : 1;
+    const setInv = (inv, f) => { if(inv) Object.assign(inv, f); };
+    setInv(find("nova",3000,"Oct 3-day virtual"), { status:"paid", desc:"Oct 6-8 virtual cohort" });
+    const n46 = find("nova",8000,"Sept");
+    setInv(n46, { amount:6000, status:"paid", desc:"Sept teaching; $2K of this is expenses, not revenue (sheet shows $6,000 received)" });
+    setInv(find("glyphic",1831.50,"Sept hours"), { status:"paid" });
+    setInv(find("sgh-admin",700,"Sept hours"), { status:"paid" });
+    setInv(find("sgh-admin",700,"July & Aug"), { status:"paid" });
+    setInv(find("radar",3750,"Prepay 10 hours Aug+"), { status:"paid", desc:"Prepay 10 hours Aug+ (paid per 11/10 sheet)" });
+    setInv(find("glyphic",2997,"Oct hours"), { amount:3663, status:"sent", sentDate:"2026-11-09", desc:"Oct hours" });
+    setInv(find("sgh-admin",1000,"Nov (projected)"), { status:"sent", desc:"Oct hours" });
+    setInv(find("sgh-hr",700,"Nov (projected)"), { status:"sent", desc:"Oct hours" });
+    setInv(find("agribank",3750,"Prepay 10 hours"), { status:"sent", sentDate:"2026-11-09", desc:"Prepay 10 hours" });
+    const addInv2 = (client, desc, amount, status, sentDate) => {
+      if(!STATE.invoices.some(i => i.client===client && near(i.amount,amount) && (i.desc||"").startsWith(desc))){
+        STATE.invoices.push({ id:nid++, client, desc, amount, status, sentDate:sentDate||"", dueDate:"", kind:"fee" });
+      }
+    };
+    addInv2("nova","Navy custom session",1350,"paid","");
+    addInv2("radar","Prepay 10 hours (Sept+)",3750,"paid","");
+
+    // Roster
+    const setMeta = (id, text) => { const c = STATE.clients.find(x => x.id===id); if(c) c.meta = text; };
+    const g = STATE.clients.find(x => x.id==="glyphic");
+    if(g && !(g.meta||"").includes("Helen")) g.meta = "Biotech · coaching 6 execs: Scotty, Josh, Lee, Sarah, Andrew (now monthly, 2nd Thursday), Helen Huang (new: weekly, Tuesdays 2pm from Nov 17)";
+    const t = STATE.clients.find(x => x.id==="agribank");
+    if(t && !(t.meta||"").includes("onboarded")) t.meta = "Executive Business Partner, Office of the CEO · transitioning to Chief of Staff · $375/hr, 10-hr prepay ($3,750) · onboarded and active, sessions Thursdays · services agreement with CEO approval / vendor management";
+    if(!STATE.clients.some(c => c.id==="elizabeth")){
+      STATE.clients.push({ id:"elizabeth", name:"Elizabeth Fulham", meta:"Self-pay · $250/hr, 10-hour start · Mondays 10am ET from Nov 9", engagements:["coaching"], prepStyle:"none" });
+    }
+    if(!STATE.billingTerms["elizabeth"]) STATE.billingTerms["elizabeth"] = { type:"hourly", hourlyRate:250, selfPay:true };
+
+    const newContacts2 = [
+      { name:"Helen Huang", context:"Glyphic Bio · Associate Director, Lab & Facilities Ops · weekly coaching, Tuesdays 2pm from Nov 17", category:"" },
+      { name:"Chris Hayes", context:"Live music for the Aug 21, 2027 party · booked; rain date Sunday held; deposit still to send", category:"Family" },
+    ];
+    const have2 = new Set(STATE.contacts.map(c => (c.name||"").toLowerCase()));
+    let cid2 = STATE.contacts.length ? Math.max(...STATE.contacts.map(c=>c.id))+1 : 1;
+    newContacts2.forEach(nc => { if(!have2.has(nc.name.toLowerCase())) STATE.contacts.push({ id:cid2++, name:nc.name, context:nc.context, actionItem:"", category:nc.category }); });
+
+    STATE.syncNov12Version = CURRENT_SYNC_NOV12_VERSION;
+    migratedOct12 = true;
+  }
+
+  // Housekeeping on every load: drop dated Family items that have already passed
+  if(Array.isArray(STATE.familyItems)){
+    const t0 = todayISO();
+    const before = STATE.familyItems.length;
+    STATE.familyItems = STATE.familyItems.filter(f => !f.date || f.date >= t0);
+    if(STATE.familyItems.length !== before) migratedOct12 = true;
+  }
+
+  if(migratedOct12){
     renderAll();
     suppressDirty = false;
     markDirty();
@@ -2414,6 +2524,14 @@ window.addEventListener("beforeunload", (e)=>{
    RENDER LOGIC
    ========================================================= */
 
+function todayISO(){
+  const d = new Date();
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
+function daysUntil(iso){
+  const a = new Date(iso+"T00:00:00"), b = new Date(todayISO()+"T00:00:00");
+  return Math.round((a-b)/86400000);
+}
 function daysChipClass(days){
   if(days <= 2) return "chip-urgent";
   if(days <= 5) return "chip-warn";
@@ -2565,16 +2683,26 @@ function renderBucketTabs(){
     btn.addEventListener("click", ()=>{ activeBucket = btn.dataset.bucket; renderBucketTabs(); renderLookAhead(); });
   });
 }
+function laEffectiveBucket(it, stored){
+  if(!it.date) return stored;
+  const d = daysUntil(it.date);
+  if(d < 0) return null;            // already past: hide
+  return d <= 30 ? "30" : d <= 60 ? "60" : "90";
+}
 function renderLookAhead(){
   const el = document.getElementById("lookAheadList");
-  const items = STATE.lookAhead[activeBucket] || [];
+  const items = [];
+  ["30","60","90"].forEach(b => (STATE.lookAhead[b]||[]).forEach(it => {
+    if(laEffectiveBucket(it, b) === activeBucket) items.push({it, stored:b});
+  }));
+  items.sort((x,y) => (x.it.date||"9999").localeCompare(y.it.date||"9999"));
   if(items.length === 0){ el.innerHTML = `<div class="empty-state">Nothing filed in this window yet.</div>`; return; }
-  el.innerHTML = items.map(it => {
+  el.innerHTML = items.map(({it, stored}) => {
     const c = clientById(it.client);
     return `<div class="la-item">
       <div class="top">
         <span class="title">${it.title}</span>
-        <button class="icon-btn" data-action="delete-la" data-bucket="${activeBucket}" data-id="${it.id}" title="Delete">✕</button>
+        <button class="icon-btn" data-action="delete-la" data-bucket="${stored}" data-id="${it.id}" title="Delete">✕</button>
       </div>
       <div class="client-tag">${c ? c.name : "—"}</div>
       <div class="note">${it.note}</div>
@@ -2975,7 +3103,7 @@ function renderInvoiceChecklist(){
   const recurring = STATE.clients.filter(c => {
     const bt = STATE.billingTerms[c.id];
     // One-time projects billed outside the recurring cycle (e.g. Carve AI - Sakata, offsite complete) are not "behind".
-    return bt && (bt.type === "hourly" || bt.type === "project") && !bt.selfPay && !bt.excludeFromRevenue;
+    return bt && bt.type === "hourly" && !bt.selfPay && !bt.excludeFromRevenue && !/offsite completed/i.test(c.meta||"");
   });
 
   const needsInvoice = recurring.map(c => {
@@ -3213,8 +3341,9 @@ function renderClientRoster(){
 /* ---------- Family & School Watch ---------- */
 function renderFamilyItems(){
   const el = document.getElementById("familyList");
-  const sorted = [...STATE.familyItems].sort((a,b) => (a.done - b.done) || (a.days - b.days));
-  document.getElementById("familyCount").textContent = `${STATE.familyItems.filter(f=>!f.done).length} open`;
+  const live = STATE.familyItems.filter(f => !f.date || daysUntil(f.date) >= 0).map(f => f.date ? Object.assign({}, f, { days: daysUntil(f.date) }) : f);
+  const sorted = live.sort((a,b) => (a.done - b.done) || (a.days - b.days));
+  document.getElementById("familyCount").textContent = `${live.filter(f=>!f.done).length} open`;
   if(sorted.length === 0){ el.innerHTML = `<div class="empty-state">Nothing flagged right now.</div>`; return; }
   el.innerHTML = sorted.map(f => `
     <div class="list-item">
@@ -3738,7 +3867,10 @@ document.getElementById("addFamilyBtn").addEventListener("click", ()=>{
   const label = input.value.trim();
   if(!label) return;
   const nextId = STATE.familyItems.length ? Math.max(...STATE.familyItems.map(f=>f.id))+1 : 1;
-  STATE.familyItems.push({ id:nextId, label, location:locInput.value.trim(), locationConflict:false, category:catSel.value, days:Number(daysInput.value)||7, done:false });
+  const addDays = Number(daysInput.value)||7;
+  const dt = new Date(); dt.setDate(dt.getDate()+addDays);
+  const dateISO = dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0");
+  STATE.familyItems.push({ id:nextId, label, location:locInput.value.trim(), locationConflict:false, category:catSel.value, days:addDays, date:dateISO, done:false });
   input.value = ""; locInput.value = ""; daysInput.value = "";
   markDirty(); renderFamilyItems();
 });
