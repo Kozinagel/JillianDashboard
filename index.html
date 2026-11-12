@@ -856,8 +856,9 @@
             <input type="text" id="familyLocation" placeholder="Location (optional)" style="width:160px;">
             <select id="familyCategorySelect">
               <option value="School">School</option>
-              <option value="Soccer">Soccer</option>
-              <option value="Flag Football">Flag Football</option>
+              <option value="Appointment">Appointment</option>
+              <option value="Evening Drive">Evening Drive</option>
+              <option value="Family">Family</option>
               <option value="Other">Other</option>
             </select>
             <input type="number" id="familyDays" placeholder="Days" style="width:70px;" min="0" max="60">
@@ -2802,6 +2803,10 @@ function renderBillingForm(clientId, bt){
       <input type="checkbox" class="bt-selfPayPrepay" ${bt.selfPay?"checked":""}> Self-pay, no invoicing (e.g. Venmo)
     </label>
 
+    <label class="bt-field-label" style="display:inline-flex; align-items:center; gap:5px; font-weight:600;">
+      <input type="checkbox" class="bt-excludeRev" ${bt.excludeFromRevenue?"checked":""}> Exclude from revenue totals (tracked separately)
+    </label>
+
     <button class="bt-save" data-action="save-bt" data-id="${clientId}">Save</button>
   </div>`;
 }
@@ -2813,6 +2818,34 @@ function fmtDate(d){
   return dt.toLocaleDateString("en-US", { month:"short", day:"numeric" });
 }
 
+let openInvoiceEditId = null;
+function renderInvoiceEditForm(inv){
+  const copts = `<option value="">No client</option>` + STATE.clients.map(c => `<option value="${c.id}" ${c.id===inv.client?"selected":""}>${escAttr(c.name)}</option>`).join("");
+  const st = inv.status;
+  return `<div class="bt-form" data-id="${inv.id}">
+    <select class="inv-edit-client">${copts}</select>
+    <input type="text" class="inv-edit-desc" value="${escAttr(inv.desc||"")}" placeholder="Description" style="flex:1; min-width:200px;">
+    <span class="bt-field-label">Amount $</span>
+    <input type="number" class="inv-edit-amount" value="${inv.amount===""||inv.amount==null?"":inv.amount}" step="0.01">
+    <span class="bt-field-label">Status</span>
+    <select class="inv-edit-status">
+      <option value="pending" ${st==="pending"?"selected":""}>Pending</option>
+      <option value="sent" ${st==="sent"?"selected":""}>Sent</option>
+      <option value="paid" ${st==="paid"?"selected":""}>Paid</option>
+    </select>
+    <span class="bt-field-label">Sent</span>
+    <input type="date" class="inv-edit-sent" value="${inv.sentDate||""}">
+    <span class="bt-field-label">Due</span>
+    <input type="date" class="inv-edit-due" value="${inv.dueDate||""}">
+    <span class="bt-field-label">Invoice #</span>
+    <input type="text" class="inv-edit-number" value="${escAttr(inv.invoiceNumber||"")}" style="width:90px;">
+    <select class="inv-edit-kind">
+      <option value="fee" ${inv.kind!=="reimbursement"?"selected":""}>Fee</option>
+      <option value="reimbursement" ${inv.kind==="reimbursement"?"selected":""}>Reimbursement</option>
+    </select>
+    <button class="bt-save" data-action="save-invoice" data-id="${inv.id}">Save</button>
+  </div>`;
+}
 let boardCollapsed = { pending:false, sent:false, paid:true };
 
 function renderInvoiceBoard(){
@@ -2851,8 +2884,10 @@ function renderInvoiceBoard(){
           ${status === "sent" ? `<button class="mini-btn" data-action="mark-paid" data-id="${inv.id}">Mark paid</button>` : ""}
           ${status === "sent" ? `<button class="mini-btn" data-action="toggle-overdue" data-id="${inv.id}">${inv.overdue ? "Unflag overdue" : "Flag overdue"}</button>` : ""}
           ${!isReimb ? `<button class="mini-btn primary" data-action="generate-pdf" data-id="${inv.id}">${inv.invoiceNumber ? "Re-download PDF" : "Generate PDF"}</button>` : ""}
+          <button class="mini-btn" data-action="edit-invoice" data-id="${inv.id}">${openInvoiceEditId===inv.id ? "Close edit" : "Edit"}</button>
           <button class="mini-btn" data-action="delete-invoice" data-id="${inv.id}">Delete</button>
         </div>
+        ${openInvoiceEditId===inv.id ? renderInvoiceEditForm(inv) : ""}
       </div>`;
     }).join("");
   });
@@ -3342,14 +3377,25 @@ function renderClientRoster(){
 }
 
 /* ---------- Family & School Watch ---------- */
+let openFamilyEditId = null;
+function renderFamilyEditForm(f){
+  return `<div class="bt-form" data-id="${f.id}">
+    <input type="text" class="fam-edit-label" value="${escAttr(f.label)}" style="flex:1; min-width:240px;">
+    <input type="text" class="fam-edit-location" value="${escAttr(f.location||"")}" placeholder="Location (optional)" style="width:180px;">
+    <input type="text" class="fam-edit-category" list="famCatList" value="${escAttr(f.category||"")}" placeholder="Category" style="width:120px;">
+    <span class="bt-field-label">Date</span>
+    <input type="date" class="fam-edit-date" value="${f.date||""}">
+    <button class="bt-save" data-action="save-family" data-id="${f.id}">Save</button>
+  </div>`;
+}
 function renderFamilyItems(){
   const el = document.getElementById("familyList");
   const live = STATE.familyItems.filter(f => !f.date || daysUntil(f.date) >= 0).map(f => f.date ? Object.assign({}, f, { days: daysUntil(f.date) }) : f);
   const sorted = live.sort((a,b) => (a.done - b.done) || (a.days - b.days));
   document.getElementById("familyCount").textContent = `${live.filter(f=>!f.done).length} open`;
   if(sorted.length === 0){ el.innerHTML = `<div class="empty-state">Nothing flagged right now.</div>`; return; }
-  el.innerHTML = sorted.map(f => `
-    <div class="list-item">
+  el.innerHTML = `<datalist id="famCatList"><option value="School"><option value="Appointment"><option value="Evening Drive"><option value="Family"><option value="Other"></datalist>` + sorted.map(f => `
+    <div class="list-item" style="flex-wrap:wrap;">
       <div class="check ${f.done ? "checked":""}" data-action="toggle-family" data-id="${f.id}"></div>
       <div class="body ${f.done ? "done":""}">
         <div class="lbl">${f.label}</div>
@@ -3360,8 +3406,10 @@ function renderFamilyItems(){
       </div>
       <div class="row-actions">
         ${!f.done ? `<span class="chip ${daysChipClass(f.days)}">${daysLabel(f.days)}</span>` : ""}
+        <button class="icon-btn" data-action="toggle-family-edit" data-id="${f.id}" title="Edit">✎</button>
         <button class="icon-btn" data-action="delete-family" data-id="${f.id}" title="Delete">✕</button>
       </div>
+      ${openFamilyEditId === f.id ? `<div style="flex-basis:100%;">${renderFamilyEditForm(f)}</div>` : ""}
     </div>`).join("");
 }
 
@@ -3611,6 +3659,7 @@ document.getElementById("clientRosterList").addEventListener("click", (e)=>{
       bt.prepayHoursUsed = Number(form.querySelector(".bt-prepayHoursUsed").value) || 0;
       bt.selfPay = form.querySelector(".bt-selfPayPrepay").checked;
     }
+    if(form.querySelector(".bt-excludeRev").checked) bt.excludeFromRevenue = true;
     STATE.billingTerms[id] = bt;
     openBillingEditId = null;
     markDirty(); renderClientRoster();
@@ -3638,6 +3687,23 @@ document.getElementById("invoiceBoard").addEventListener("click", (e)=>{
   if(target.dataset.action === "toggle-overdue" && inv){ inv.overdue = !inv.overdue; markDirty(); renderInvoiceBoard(); }
   if(target.dataset.action === "delete-invoice"){ STATE.invoices = STATE.invoices.filter(x=>x.id!==id); markDirty(); renderInvoiceBoard(); renderReceivablesSummary(); renderInvoiceChecklist(); }
   if(target.dataset.action === "generate-pdf"){ generateInvoicePDF(id); }
+  if(target.dataset.action === "edit-invoice"){ openInvoiceEditId = (openInvoiceEditId === id) ? null : id; renderInvoiceBoard(); }
+  if(target.dataset.action === "save-invoice" && inv){
+    const form = target.closest(".bt-form");
+    inv.client = form.querySelector(".inv-edit-client").value || null;
+    inv.desc = form.querySelector(".inv-edit-desc").value.trim();
+    const amt = form.querySelector(".inv-edit-amount").value;
+    inv.amount = amt === "" ? "" : Number(amt);
+    inv.status = form.querySelector(".inv-edit-status").value;
+    if(inv.status !== "sent") inv.overdue = false;
+    inv.sentDate = form.querySelector(".inv-edit-sent").value;
+    inv.dueDate = form.querySelector(".inv-edit-due").value;
+    const num = form.querySelector(".inv-edit-number").value.trim();
+    if(num) inv.invoiceNumber = num; else delete inv.invoiceNumber;
+    inv.kind = form.querySelector(".inv-edit-kind").value;
+    openInvoiceEditId = null;
+    markDirty(); renderInvoiceBoard(); renderReceivablesSummary(); renderInvoiceChecklist();
+  }
 });
 
 document.getElementById("saveBizInfoBtn").addEventListener("click", ()=>{
@@ -3852,6 +3918,24 @@ document.getElementById("familyList").addEventListener("click", (e)=>{
   const id = Number(target.dataset.id);
   if(target.dataset.action === "toggle-family"){
     const f = STATE.familyItems.find(x=>x.id===id); if(f) f.done = !f.done;
+    markDirty(); renderFamilyItems();
+  }
+  if(target.dataset.action === "toggle-family-edit"){
+    openFamilyEditId = (openFamilyEditId === id) ? null : id;
+    renderFamilyItems();
+  }
+  if(target.dataset.action === "save-family"){
+    const form = target.closest(".bt-form");
+    const f = STATE.familyItems.find(x=>x.id===id);
+    if(f){
+      f.label = form.querySelector(".fam-edit-label").value.trim() || f.label;
+      f.location = form.querySelector(".fam-edit-location").value.trim();
+      f.locationConflict = false;
+      f.category = form.querySelector(".fam-edit-category").value.trim() || "Other";
+      const d = form.querySelector(".fam-edit-date").value;
+      if(d){ f.date = d; f.days = daysUntil(d); }
+    }
+    openFamilyEditId = null;
     markDirty(); renderFamilyItems();
   }
   if(target.dataset.action === "delete-family"){
