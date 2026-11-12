@@ -816,7 +816,6 @@
           <div class="item-list" id="actionsList"></div>
           <div class="add-row">
             <input type="text" id="actionInput" placeholder="New action item…">
-            <select id="actionClientSelect"></select>
             <input type="number" id="actionDays" placeholder="Days" style="width:70px;" min="0" max="14">
             <button class="btn" id="addActionBtn">Add</button>
           </div>
@@ -1194,18 +1193,24 @@ let STATE = {
   lookAhead: {
     "30": [
       { id:301, client:"glyphic", date:"2026-11-17", title:"Helen (Glyphic) weekly coaching begins", note:"Tue Nov 17, 2pm; weekly on Tuesdays", needsPrepNow:false },
+      { id:307, client:null, date:"2026-11-25", title:"Thanksgiving week: River early release", note:"Wed Nov 25, middle school dismissal 11:20am (Tigers' Den closes 4pm)", needsPrepNow:false },
+      { id:308, client:null, date:"2026-11-26", title:"Thanksgiving: River off Thu Nov 26 and Fri Nov 27", note:"No school Nov 26-27; back Mon Nov 30. Calendar still shows coaching on Thanksgiving Day (Courtney 1pm, Tali 3pm)", needsPrepNow:false },
       { id:302, client:null, date:"2026-12-04", title:"Chief of Staff Roundtable: Advisory Board meeting", note:"Fri Dec 4, 10am", needsPrepNow:false },
-      { id:303, client:null, date:"2026-12-09", title:"Podcast interview with Jeremy Burrows", note:"Wed Dec 9, 11am; headshot still to send", needsPrepNow:false },
+      { id:309, client:null, date:"2026-12-03", title:"Birthday: Regina Hufnagel", note:"Thu Dec 3", needsPrepNow:false },
+      { id:303, client:null, date:"2026-12-09", title:"Podcast interview with Jeremy Burrows", note:"Wed Dec 9, 11am; headshot still to send. River early release 11:20am same day", needsPrepNow:false },
       { id:304, client:"generate", date:"2026-12-11", title:"Ola end-of-year check-in (Constructive Bio)", note:"Target early to mid Dec; not yet scheduled", needsPrepNow:false },
     ],
     "60": [
       { id:305, client:"generate", date:"2026-12-14", title:"OKRs Q4 review and wrap-up", note:"Mon Dec 14, 10:30am", needsPrepNow:false },
+      { id:310, client:null, date:"2026-12-14", title:"Birthday: Jax Baker", note:"Mon Dec 14", needsPrepNow:false },
+      { id:311, client:null, date:"2026-12-18", title:"Birthday: Linda Hufnagel (Mom)", note:"Fri Dec 18", needsPrepNow:false },
+      { id:312, client:null, date:"2026-12-24", title:"Christmas break: River off Thu Dec 24 through Fri Jan 1", note:"No school Dec 24 to Jan 1; back Mon Jan 4. River physical Dec 24, 10am. Calendar still shows coaching Dec 24 (Sophia 12pm, Courtney 1pm, Tali 3pm) and Dec 31 (Radar 1:30pm, Tali 3pm)", needsPrepNow:false },
+      { id:313, client:null, date:"2026-12-27", title:"Birthday: Jillian", note:"Sun Dec 27", needsPrepNow:false },
     ],
     "90": [
       { id:306, client:null, date:"2027-01-21", title:"Admin Awards Institute: performance-review prep session", note:"Thu Jan 21 (from Admin Awards email; not yet on calendar)", needsPrepNow:false },
     ],
   },
-
   billingTerms: {
     "agribank": { type:"prepay", prepayHours:10, prepayRate:375, prepayHoursUsed:0 },
     glyphic:   { type:"hourly", hourlyRate:333 },
@@ -1535,14 +1540,14 @@ let STATE = {
     { id:305, date:"2026-11-19", label:"EVENING: Erik's birthday and sleepover, 5-9pm (location not on calendar: confirm drop-off and pick-up). Your Josh call at 7:30pm is virtual", category:"Evening Drive", days:0, done:false },
     { id:306, date:"2026-11-20", label:"No school: full-day conference (district calendar)", category:"School", days:0, done:false },
     { id:307, date:"2026-11-24", label:"EVENING, DRIVING: Dinner at Tavern in the Square, Andover, 7-8:30pm. Estimate 30 to 40 minutes each way: leave by 6:15pm", category:"Evening Drive", location:"Tavern in the Square, Andover", locationConflict:false, days:0, done:false },
-    { id:308, date:"2026-11-25", label:"Early release before Thanksgiving break", category:"School", days:0, done:false },
-    { id:309, date:"2026-11-26", label:"Thanksgiving break: no school Nov 26-27", category:"School", days:0, done:false },
+    { id:308, date:"2026-11-25", label:"Early release before Thanksgiving break: River dismissed 11:20am (Tigers' Den closes 4pm)", category:"School", days:0, done:false },
+    { id:309, date:"2026-11-26", label:"Thanksgiving break: River off Thu Nov 26 and Fri Nov 27, back Mon Nov 30", category:"School", days:0, done:false },
     { id:310, date:"2026-12-02", label:"River: Ortho, 10:15am", category:"Appointment", location:"133 Littleton Rd, suite 104", locationConflict:false, days:0, done:false },
-    { id:311, date:"2026-12-09", label:"Early release (district calendar)", category:"School", days:0, done:false },
+    { id:311, date:"2026-12-09", label:"Early release: River dismissed 11:20am (district calendar)", category:"School", days:0, done:false },
     { id:312, date:"2026-12-12", label:"EVENING: Holiday Open House, 3:15-8pm (location not on calendar: confirm address and drive time)", category:"Evening Drive", days:0, done:false },
-    { id:313, date:"2026-12-24", label:"River: physical with Carmen, 10am. School break runs Dec 24 to Jan 1", category:"Appointment", days:0, done:false },
+    { id:313, date:"2026-12-24", label:"River: physical with Carmen, 10am. Christmas break: River off Dec 24 through Jan 1, back Mon Jan 4", category:"Appointment", days:0, done:false },
     { id:314, date:"2027-01-06", label:"River: Ortho, 3:30pm", category:"Appointment", location:"133 Littleton Rd, suite 104", locationConflict:false, days:0, done:false },
-    { id:315, date:"2027-01-13", label:"Early release (district calendar)", category:"School", days:0, done:false },
+    { id:315, date:"2027-01-13", label:"Early release: River dismissed 11:20am (district calendar)", category:"School", days:0, done:false },
     { id:316, date:"2027-01-18", label:"No school: Martin Luther King Jr. Day", category:"School", days:0, done:false },
     { id:317, date:"2027-05-01", label:"Parents return from Florida (away until May)", category:"Family", days:0, done:false },
     { id:318, date:"2027-08-21", label:"Party, Aug 21: parents secured the caterer; live music is booked (Chris Hayes, rain date Sunday held). Deposit for the band still to send", category:"Family", days:0, done:false },
@@ -2151,7 +2156,7 @@ function loadIntoState(obj){
   // One-time sync (Nov 12): Look Ahead trimmed to Big items, Family & School Watch refreshed (no sports),
   // invoices matched to the 11/10 sheet, Tali / Helen / Andrew / Elizabeth roster updates.
   // Every step is idempotent. Manual Look Ahead items and manually added dated Family items are kept.
-  const CURRENT_SYNC_NOV12_VERSION = 1;
+  const CURRENT_SYNC_NOV12_VERSION = 2;
   if(!obj.syncNov12Version || obj.syncNov12Version < CURRENT_SYNC_NOV12_VERSION){
     const manual = [];
     ["30","60","90"].forEach(b => (STATE.lookAhead[b]||[]).forEach(it => { if(it.note === "Added manually") manual.push({bucket:b, it}); }));
@@ -2161,7 +2166,7 @@ function loadIntoState(obj){
     STATE.lookAhead = la;
     const seedLabels2 = new Set(SEED_FAMILY.map(f => f.label));
     const oldSeedLabels = /Flag Football|Travel Soccer|Night at the Revs|Nashville travel|Oliver's birthday hold|Forge Pond|Picture Day|coaches/i;
-    const kept2 = (STATE.familyItems||[]).filter(f => f.date && !seedLabels2.has(f.label) && !oldSeedLabels.test(f.label) && !(f.id>=101 && f.id<=118) && !(f.id>=301 && f.id<=318));
+    const kept2 = (STATE.familyItems||[]).filter(f => f.date && !seedLabels2.has(f.label) && !oldSeedLabels.test(f.label) && !(f.id>=101 && f.id<=118) && !(f.id>=301 && f.id<=330));
     let fid2 = 400;
     const ids = kept2.map(f => Object.assign({}, f, { id: fid2++ }));
     STATE.familyItems = JSON.parse(JSON.stringify(SEED_FAMILY)).concat(ids);
@@ -2660,9 +2665,7 @@ function renderActions(){
       <div class="check ${a.done ? "checked":""}" data-action="toggle-action" data-id="${a.id}"></div>
       <div class="body ${a.done ? "done":""}">
         <div class="lbl">${a.label}</div>
-        <div class="rowtags">
-          <span class="client-tag">${c ? c.name : "—"}</span>
-        </div>
+        ${c ? `<div class="rowtags"><span class="client-tag">${c.name}</span></div>` : ""}
       </div>
       <div class="row-actions">
         ${!a.done ? `<span class="chip ${daysChipClass(a.days)}">${daysLabel(a.days)}</span>` : ""}
@@ -3397,7 +3400,6 @@ function renderPersonalProjects(){
 /* ---------- Inline client selects for add-item forms ---------- */
 function populateInlineClientSelects(){
   const opts = STATE.clients.map(c => `<option value="${c.id}">${c.name}</option>`).join("");
-  document.getElementById("actionClientSelect").innerHTML = opts;
   document.getElementById("laClientSelect").innerHTML = opts;
   document.getElementById("invClientSelect").innerHTML = opts;
   document.getElementById("followupClientSelect").innerHTML = opts;
@@ -3514,12 +3516,11 @@ document.getElementById("actionsList").addEventListener("click", (e)=>{
 
 document.getElementById("addActionBtn").addEventListener("click", ()=>{
   const input = document.getElementById("actionInput");
-  const clientSel = document.getElementById("actionClientSelect");
   const daysInput = document.getElementById("actionDays");
   const label = input.value.trim();
   if(!label) return;
   const nextId = STATE.actions.length ? Math.max(...STATE.actions.map(a=>a.id))+1 : 1;
-  STATE.actions.push({ id:nextId, client:clientSel.value, label, days: Number(daysInput.value)||7, done:false });
+  STATE.actions.push({ id:nextId, client:null, label, days: Number(daysInput.value)||7, done:false });
   input.value = ""; daysInput.value = "";
   markDirty(); renderActions();
 });
