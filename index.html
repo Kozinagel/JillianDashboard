@@ -377,6 +377,13 @@
   .rec-tile{ background:var(--paper); border:1px solid var(--line-soft); border-radius:8px; padding:12px 14px; }
   .rec-tile .rec-label{ font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:var(--ink-faint); margin-bottom:4px; }
   .rec-tile .rec-value{ font-size:19px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .ov-input{ width:100%; font:inherit; font-weight:700; font-variant-numeric:tabular-nums; background:transparent; border:1px dashed transparent; border-radius:5px; padding:1px 4px; margin-left:-4px; color:inherit; }
+  .ov-input:hover, .ov-input:focus{ border-color:var(--line); background:var(--card, #fff); }
+  .ov-reset{ font-size:11px; font-weight:600; color:var(--ink-faint); background:none; border:none; cursor:pointer; padding:0; text-decoration:underline; }
+  .tax-paid-row{ display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:14px 0 6px; }
+  .tax-bal{ font-weight:700; font-variant-numeric:tabular-nums; }
+  .board-card[draggable="true"]{ cursor:grab; }
+  .board-col.drag-over{ outline:2px dashed var(--ink-faint); outline-offset:-3px; }
   @media (max-width:600px){ .rec-strip{ grid-template-columns:1fr; } }
 
   .target-row{ display:flex; align-items:center; gap:12px; margin-bottom:6px; flex-wrap:wrap; }
@@ -944,6 +951,7 @@
         <span class="panel-note" id="taxBaseText"></span>
       </div>
       <div class="tax-quarters" id="taxQuarters"></div>
+      <div class="tax-paid-row" id="taxPaidRow"></div>
 
       <p class="inv-subhead" style="margin-top:18px;">Excluded from Revenue &amp; Taxes</p>
       <p class="panel-note" style="margin:-4px 0 10px;">Self-pay/Venmo clients (Lisa S, Lisa C, Regina, Courtney, Clodagh) plus anything tracked in a separate part of your sheet (Carve AI - Sakata) — none of this feeds the Pending/Outstanding/YTD Received tiles or the tax estimate above.</p>
@@ -1379,6 +1387,9 @@ let STATE = {
 
   // Flat tax rate used for the quarterly estimate — matches the flat 20% your 2026 sheet uses.
   taxRate: 20,
+  taxesPaid: 14000,
+  taxesPaidNote: "Prepaid federal (per 11/9 sheet)",
+  overrides: {},
 
   // Business info for generated invoice PDFs — starts empty on purpose. Fill in once via the
   // "Business Info & Payment Details" form; it saves to your private database, never hardcoded
@@ -1865,6 +1876,9 @@ function loadIntoState(obj){
   STATE.revenueTarget = (obj.revenueTarget !== undefined && obj.revenueTarget !== null) ? obj.revenueTarget : STATE.revenueTarget;
   STATE.ytdReceivedBaseline = (obj.ytdReceivedBaseline !== undefined && obj.ytdReceivedBaseline !== null) ? obj.ytdReceivedBaseline : STATE.ytdReceivedBaseline;
   STATE.taxRate = (obj.taxRate !== undefined && obj.taxRate !== null) ? obj.taxRate : STATE.taxRate;
+  STATE.taxesPaid = (obj.taxesPaid !== undefined && obj.taxesPaid !== null) ? obj.taxesPaid : STATE.taxesPaid;
+  STATE.taxesPaidNote = (obj.taxesPaidNote !== undefined && obj.taxesPaidNote !== null) ? obj.taxesPaidNote : STATE.taxesPaidNote;
+  STATE.overrides = obj.overrides || {};
   STATE.businessInfo = obj.businessInfo || STATE.businessInfo;
   STATE.nextInvoiceNumber = (obj.nextInvoiceNumber !== undefined && obj.nextInvoiceNumber !== null) ? obj.nextInvoiceNumber : STATE.nextInvoiceNumber;
   STATE.personalProjects = obj.personalProjects || STATE.personalProjects;
@@ -2157,7 +2171,7 @@ function loadIntoState(obj){
   // One-time sync (Nov 12): Look Ahead trimmed to Big items, Family & School Watch refreshed (no sports),
   // invoices matched to the 11/10 sheet, Tali / Helen / Andrew / Elizabeth roster updates.
   // Every step is idempotent. Manual Look Ahead items and manually added dated Family items are kept.
-  const CURRENT_SYNC_NOV12_VERSION = 2;
+  const CURRENT_SYNC_NOV12_VERSION = 3;
   if(!obj.syncNov12Version || obj.syncNov12Version < CURRENT_SYNC_NOV12_VERSION){
     const manual = [];
     ["30","60","90"].forEach(b => (STATE.lookAhead[b]||[]).forEach(it => { if(it.note === "Added manually") manual.push({bucket:b, it}); }));
@@ -2213,6 +2227,17 @@ function loadIntoState(obj){
     const have2 = new Set(STATE.contacts.map(c => (c.name||"").toLowerCase()));
     let cid2 = STATE.contacts.length ? Math.max(...STATE.contacts.map(c=>c.id))+1 : 1;
     newContacts2.forEach(nc => { if(!have2.has(nc.name.toLowerCase())) STATE.contacts.push({ id:cid2++, name:nc.name, context:nc.context, actionItem:"", category:nc.category }); });
+
+    // SGH October invoices have not gone out yet: back to Pending, with a to-do to send each
+    [["sgh-admin",1000],["sgh-hr",700]].forEach(([cl,amt]) => {
+      const iv = find(cl, amt, "Oct hours");
+      if(iv && iv.status === "sent" && !iv.sentDate){ iv.status = "pending"; }
+    });
+    STATE.actions = STATE.actions || [];
+    let aid2 = STATE.actions.length ? Math.max(...STATE.actions.map(a=>a.id))+1 : 1;
+    [["sgh-admin","Send October invoice to SGH Admin (Oct hours)"],["sgh-hr","Send October invoice to SGH HR & Corp Project (Oct hours)"]].forEach(([cl,label]) => {
+      if(!STATE.actions.some(a => a.label === label)) STATE.actions.push({ id:aid2++, client:cl, label, days:2, done:false });
+    });
 
     STATE.syncNov12Version = CURRENT_SYNC_NOV12_VERSION;
     migratedOct12 = true;
@@ -2871,7 +2896,7 @@ function renderInvoiceBoard(){
     body.innerHTML = sorted.length === 0 ? `<div class="board-empty">Nothing here</div>` : sorted.map(inv => {
       const c = clientById(inv.client);
       const isReimb = inv.kind === "reimbursement";
-      return `<div class="board-card ${inv.overdue ? "overdue" : ""}">
+      return `<div class="board-card ${inv.overdue ? "overdue" : ""}" draggable="true" data-inv="${inv.id}">
         <div class="bc-client">${c ? c.name : "—"} ${isReimb ? `<span class="kind-badge">Reimb.</span>` : ""}</div>
         <div class="bc-desc">${inv.desc}</div>
         ${inv.invoiceNumber ? `<div class="bc-inv-number">Invoice #${inv.invoiceNumber}</div>` : ""}
@@ -2882,6 +2907,8 @@ function renderInvoiceBoard(){
         <div class="bc-actions">
           ${status === "pending" ? `<button class="mini-btn" data-action="mark-sent" data-id="${inv.id}">Mark sent</button>` : ""}
           ${status === "sent" ? `<button class="mini-btn" data-action="mark-paid" data-id="${inv.id}">Mark paid</button>` : ""}
+          ${status !== "pending" ? `<button class="mini-btn" data-action="move-pending" data-id="${inv.id}">Move to Pending</button>` : ""}
+          ${status === "paid" ? `<button class="mini-btn" data-action="move-sent" data-id="${inv.id}">Move to Sent</button>` : ""}
           ${status === "sent" ? `<button class="mini-btn" data-action="toggle-overdue" data-id="${inv.id}">${inv.overdue ? "Unflag overdue" : "Flag overdue"}</button>` : ""}
           ${!isReimb ? `<button class="mini-btn primary" data-action="generate-pdf" data-id="${inv.id}">${inv.invoiceNumber ? "Re-download PDF" : "Generate PDF"}</button>` : ""}
           <button class="mini-btn" data-action="edit-invoice" data-id="${inv.id}">${openInvoiceEditId===inv.id ? "Close edit" : "Edit"}</button>
@@ -3034,14 +3061,22 @@ function generateInvoicePDF(invoiceId){
   renderInvoiceBoard();
 }
 
+function ovVal(key, auto){ const v = (STATE.overrides||{})[key]; return (v !== undefined && v !== null) ? Number(v) : auto; }
+function ovTile(key, auto, cls){
+  const has = (STATE.overrides||{})[key] !== undefined && (STATE.overrides||{})[key] !== null;
+  const val = ovVal(key, auto);
+  return `<input type="number" step="0.01" class="ov-input ${cls||""}" data-ov="${key}" value="${Math.round(val*100)/100}">` +
+    (has ? `<button class="ov-reset" data-ov-reset="${key}" title="Back to the calculated value ($${Math.round(auto).toLocaleString()})">manual · reset</button>` : "");
+}
 function renderReceivablesSummary(){
   const el = document.getElementById("receivablesStrip");
   // Self-pay/Venmo clients (no formal invoicing) are excluded entirely from revenue and tax
   // math per user instruction — they're tracked separately in the Self-Pay mini dashboard.
   const feeInvoices = STATE.invoices.filter(i => i.kind !== "reimbursement" && i.amount !== "" && i.amount != null && !isExcludedFromRevenue(i.client));
 
-  const outstanding = feeInvoices.filter(i => i.status === "sent")
+  const outstandingAuto = feeInvoices.filter(i => i.status === "sent")
     .reduce((s,i) => s + Number(i.amount), 0);
+  const outstanding = ovVal("outstanding", outstandingAuto);
 
   const pendingFromHours = STATE.clients.reduce((s,c) => {
     const bt = STATE.billingTerms[c.id];
@@ -3051,22 +3086,24 @@ function renderReceivablesSummary(){
     return s;
   }, 0);
   const pendingFromBoard = feeInvoices.filter(i => i.status === "pending").reduce((s,i) => s + Number(i.amount), 0);
-  const pending = pendingFromHours + pendingFromBoard;
+  const pendingAuto = pendingFromHours + pendingFromBoard;
+  const pending = ovVal("pending", pendingAuto);
 
   // No year filter here — every "paid" invoice in the array is something you've explicitly
   // logged as a real 2026 payment (your sheet itself includes one Nov-2025-dated line in its
   // "2026 Payments Received" total, so a strict date filter would under-count vs. the sheet).
   const ytdFromTracker = feeInvoices.filter(i => i.status === "paid")
     .reduce((s,i) => s + Number(i.amount), 0);
-  const ytdReceived = (STATE.ytdReceivedBaseline || 0) + ytdFromTracker;
+  const ytdAuto = (STATE.ytdReceivedBaseline || 0) + ytdFromTracker;
+  const ytdReceived = ovVal("ytd", ytdAuto);
 
   const target = STATE.revenueTarget || 0;
   const pct = target ? Math.min(100, Math.round((ytdReceived / target) * 100)) : 0;
 
   el.innerHTML = `
-    <div class="rec-tile"><div class="rec-label">Pending (invoice board + accrued hours)</div><div class="rec-value">$${pending.toLocaleString(undefined,{maximumFractionDigits:0})}</div></div>
-    <div class="rec-tile"><div class="rec-label">Outstanding (sent, unpaid)</div><div class="rec-value">$${outstanding.toLocaleString(undefined,{maximumFractionDigits:0})}</div></div>
-    <div class="rec-tile"><div class="rec-label">YTD Received</div><div class="rec-value">$${ytdReceived.toLocaleString(undefined,{maximumFractionDigits:0})}</div></div>
+    <div class="rec-tile"><div class="rec-label">Pending (invoice board + accrued hours)</div><div class="rec-value">${ovTile("pending", pendingAuto)}</div></div>
+    <div class="rec-tile"><div class="rec-label">Outstanding (sent, unpaid)</div><div class="rec-value">${ovTile("outstanding", outstandingAuto)}</div></div>
+    <div class="rec-tile"><div class="rec-label">YTD Received</div><div class="rec-value">${ovTile("ytd", ytdAuto)}</div></div>
   `;
 
   document.getElementById("targetProgressText").textContent =
@@ -3086,7 +3123,7 @@ function renderTaxEstimate(pending, outstanding, ytdReceived){
   // its numbers exactly: 20% × $131,029.25 = $26,205.85).
   const base = pending + ytdReceived;
   const totalTax = base * (rate / 100);
-  const quarterly = totalTax / 4;
+  const quarterlyAuto = totalTax / 4;
 
   document.getElementById("taxRateInput").value = rate;
   document.getElementById("taxBaseText").textContent =
@@ -3095,8 +3132,18 @@ function renderTaxEstimate(pending, outstanding, ytdReceived){
   document.getElementById("taxQuarters").innerHTML = ["Q1","Q2","Q3","Q4"].map(q => `
     <div class="tax-q-tile">
       <div class="lbl">${q}</div>
-      <div class="val">$${quarterly.toLocaleString(undefined,{maximumFractionDigits:0})}</div>
+      <div class="val">${ovTile("tax"+q, quarterlyAuto)}</div>
     </div>`).join("");
+
+  const paid = Number(STATE.taxesPaid) || 0;
+  const balance = totalTax - paid;
+  document.getElementById("taxPaidRow").innerHTML = `
+    <span class="target-label">Taxes paid so far $</span>
+    <input type="number" step="0.01" id="taxesPaidInput" class="target-input" value="${paid}">
+    <input type="text" id="taxesPaidNote" class="target-input" style="width:240px;" placeholder="Note (e.g. prepaid federal 11/9)" value="${escAttr(STATE.taxesPaidNote||"")}">
+    <span class="panel-note">Estimated balance remaining:</span>
+    <span class="tax-bal">$${balance.toLocaleString(undefined,{maximumFractionDigits:2})}</span>
+    <span class="panel-note">(on $${totalTax.toLocaleString(undefined,{maximumFractionDigits:2})} estimated total)</span>`;
 }
 
 /* ---------- Self-Pay Dashboard (excluded from revenue/tax above) ---------- */
@@ -3117,10 +3164,11 @@ function renderSelfPayDashboard(){
     const ytd = STATE.invoices
       .filter(i => i.client === c.id && i.kind !== "reimbursement" && i.status === "paid" && (i.sentDate||"").startsWith(thisYear))
       .reduce((s,i) => s + (Number(i.amount) || 0), 0);
-    grandTotal += ytd;
+    const ytdShown = ovVal("sp_"+c.id, ytd);
+    grandTotal += ytdShown;
     return `<div class="selfpay-tile">
       <div class="lbl">${c.name} <span style="font-weight:400;">(${reason})</span></div>
-      <div class="val">$${ytd.toLocaleString(undefined,{maximumFractionDigits:0})}</div>
+      <div class="val">${ovTile("sp_"+c.id, ytd)}</div>
     </div>`;
   }).join("");
 
@@ -3677,6 +3725,42 @@ document.getElementById("clientRosterList").addEventListener("change", (e)=>{
 });
 
 /* ---- Invoice Tracker events ---- */
+function moveInvoice(inv, status){
+  if(!inv || inv.status === status) return;
+  inv.status = status;
+  if(status === "pending"){ inv.overdue = false; inv.sentDate = ""; }
+  if(status === "sent"){ inv.overdue = false; inv.sentDate = inv.sentDate || new Date().toISOString().slice(0,10); }
+  if(status === "paid"){ inv.overdue = false; }
+  markDirty(); renderInvoiceBoard(); renderReceivablesSummary(); renderInvoiceChecklist();
+}
+(function(){
+  const board = document.getElementById("invoiceBoard");
+  board.addEventListener("dragstart", (e)=>{
+    const card = e.target.closest(".board-card[data-inv]");
+    if(!card) return;
+    e.dataTransfer.setData("text/plain", card.dataset.inv);
+    e.dataTransfer.effectAllowed = "move";
+  });
+  board.addEventListener("dragover", (e)=>{
+    const col = e.target.closest(".board-col");
+    if(!col) return;
+    e.preventDefault();
+    board.querySelectorAll(".board-col.drag-over").forEach(c => { if(c !== col) c.classList.remove("drag-over"); });
+    col.classList.add("drag-over");
+  });
+  board.addEventListener("dragleave", (e)=>{
+    if(!board.contains(e.relatedTarget)) board.querySelectorAll(".board-col.drag-over").forEach(c => c.classList.remove("drag-over"));
+  });
+  board.addEventListener("drop", (e)=>{
+    const col = e.target.closest(".board-col");
+    board.querySelectorAll(".board-col.drag-over").forEach(c => c.classList.remove("drag-over"));
+    if(!col) return;
+    e.preventDefault();
+    const id = Number(e.dataTransfer.getData("text/plain"));
+    const status = col.classList.contains("pending") ? "pending" : col.classList.contains("sent") ? "sent" : "paid";
+    moveInvoice(STATE.invoices.find(x=>x.id===id), status);
+  });
+})();
 document.getElementById("invoiceBoard").addEventListener("click", (e)=>{
   const target = e.target.closest("[data-action]");
   if(!target) return;
@@ -3687,6 +3771,8 @@ document.getElementById("invoiceBoard").addEventListener("click", (e)=>{
   if(target.dataset.action === "toggle-overdue" && inv){ inv.overdue = !inv.overdue; markDirty(); renderInvoiceBoard(); }
   if(target.dataset.action === "delete-invoice"){ STATE.invoices = STATE.invoices.filter(x=>x.id!==id); markDirty(); renderInvoiceBoard(); renderReceivablesSummary(); renderInvoiceChecklist(); }
   if(target.dataset.action === "generate-pdf"){ generateInvoicePDF(id); }
+  if(target.dataset.action === "move-pending" && inv){ moveInvoice(inv, "pending"); }
+  if(target.dataset.action === "move-sent" && inv){ moveInvoice(inv, "sent"); }
   if(target.dataset.action === "edit-invoice"){ openInvoiceEditId = (openInvoiceEditId === id) ? null : id; renderInvoiceBoard(); }
   if(target.dataset.action === "save-invoice" && inv){
     const form = target.closest(".bt-form");
@@ -3757,6 +3843,26 @@ document.getElementById("invoiceChecklist").addEventListener("click", (e)=>{
   document.getElementById("invClientSelect").value = btn.dataset.id;
   document.getElementById("invDescInput").focus();
   document.getElementById("invDescInput").scrollIntoView({behavior:"smooth", block:"center"});
+});
+
+/* ---- Manual overrides on summary tiles, taxes paid ---- */
+document.addEventListener("change", (e)=>{
+  const t = e.target;
+  if(t.dataset && t.dataset.ov){
+    STATE.overrides = STATE.overrides || {};
+    if(t.value === "") delete STATE.overrides[t.dataset.ov]; else STATE.overrides[t.dataset.ov] = Number(t.value);
+    markDirty(); renderReceivablesSummary();
+  } else if(t.id === "taxesPaidInput"){
+    STATE.taxesPaid = Number(t.value) || 0; markDirty(); renderReceivablesSummary();
+  } else if(t.id === "taxesPaidNote"){
+    STATE.taxesPaidNote = t.value.trim(); markDirty();
+  }
+});
+document.addEventListener("click", (e)=>{
+  const b = e.target.closest("[data-ov-reset]");
+  if(!b) return;
+  if(STATE.overrides) delete STATE.overrides[b.dataset.ovReset];
+  markDirty(); renderReceivablesSummary();
 });
 
 /* ---- Revenue Target events ---- */
