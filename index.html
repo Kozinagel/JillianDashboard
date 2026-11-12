@@ -483,6 +483,16 @@
     padding:12px 0; border-bottom:1px solid var(--line-soft);
   }
   .cr-row:last-child{ border-bottom:none; }
+  .cr-row.st-active{ border-left:4px solid #2f7d5b; padding-left:10px; background:linear-gradient(90deg, rgba(47,125,91,.07), transparent 40%); }
+  .cr-row.st-paused{ border-left:4px solid #c98a1b; padding-left:10px; background:linear-gradient(90deg, rgba(201,138,27,.10), transparent 40%); }
+  .st-select{ font-size:12px; font-weight:700; border-radius:999px; padding:2px 8px; width:auto; align-self:flex-start; }
+  .st-select.st-active{ color:#2f7d5b; background:#e4f0ea; border:1px solid #b9d9c8; }
+  .st-select.st-paused{ color:#9a6410; background:#f8ecd6; border:1px solid #ecd2a0; }
+  .selfpay-tile.st-active{ border-left:4px solid #2f7d5b; background:#eef6f1; }
+  .selfpay-tile.st-paused{ border-left:4px solid #c98a1b; background:#fbf3e3; }
+  .st-dot{ display:inline-block; font-size:10px; font-weight:700; border-radius:999px; padding:1px 7px; margin-left:4px; }
+  .st-dot.st-active{ color:#2f7d5b; background:#d7eadf; }
+  .st-dot.st-paused{ color:#9a6410; background:#f3e0b8; }
   .cr-fields{ display:flex; flex-direction:column; gap:6px; min-width:0; }
   .cr-fields input{
     font-size:13px; padding:7px 9px; border-radius:6px; border:1px solid var(--line); background:var(--paper); color:var(--ink);
@@ -1051,6 +1061,9 @@
       <div class="cr-add-row">
         <input type="text" id="crNameInput" placeholder="New client / company name">
         <input type="text" id="crMetaInput" placeholder="Notes (contacts, cadence, etc.)" style="flex:1;">
+        <select id="crStatusSelect"><option value="active">Active</option><option value="paused">Paused</option></select>
+        <label class="bt-field-label" style="display:inline-flex; align-items:center; gap:5px; font-weight:600;"><input type="checkbox" id="crSelfPay"> Self-pay</label>
+        <input type="number" id="crRateInput" placeholder="Rate $/hr" style="width:90px;" min="0">
         <button class="btn" id="addClientBtn">Add client</button>
       </div>
     </section>
@@ -2171,7 +2184,7 @@ function loadIntoState(obj){
   // One-time sync (Nov 12): Look Ahead trimmed to Big items, Family & School Watch refreshed (no sports),
   // invoices matched to the 11/10 sheet, Tali / Helen / Andrew / Elizabeth roster updates.
   // Every step is idempotent. Manual Look Ahead items and manually added dated Family items are kept.
-  const CURRENT_SYNC_NOV12_VERSION = 3;
+  const CURRENT_SYNC_NOV12_VERSION = 6;
   if(!obj.syncNov12Version || obj.syncNov12Version < CURRENT_SYNC_NOV12_VERSION){
     const manual = [];
     ["30","60","90"].forEach(b => (STATE.lookAhead[b]||[]).forEach(it => { if(it.note === "Added manually") manual.push({bucket:b, it}); }));
@@ -2238,6 +2251,32 @@ function loadIntoState(obj){
     [["sgh-admin","Send October invoice to SGH Admin (Oct hours)"],["sgh-hr","Send October invoice to SGH HR & Corp Project (Oct hours)"]].forEach(([cl,label]) => {
       if(!STATE.actions.some(a => a.label === label)) STATE.actions.push({ id:aid2++, client:cl, label, days:2, done:false });
     });
+
+    // Client status (active / paused) for color coding; Regina is paused per the client sheet
+    STATE.clients.forEach(c => { if(!c.status) c.status = (c.id === "regina") ? "paused" : "active"; });
+
+    // Self-pay sheet (Nov 12): statuses, Lindsay Flood, and year-to-date totals per client
+    const setSt = (id, st, note) => { const c = STATE.clients.find(x=>x.id===id); if(c){ c.status = st; if(note && !(c.meta||"").includes(note)) c.meta = (c.meta||"") + " · " + note; } };
+    setSt("lisa-s","paused","paused in Sept 2026");
+    setSt("regina","paused","paused July 2026");
+    if(!STATE.clients.some(c => c.id==="lindsay-flood")){
+      STATE.clients.push({ id:"lindsay-flood", name:"Lindsay Flood", meta:"RepareRx · self-pay $200/hr, Venmo, no invoicing", engagements:["coaching"], prepStyle:"none", status:"active" });
+    }
+    if(!STATE.billingTerms["lindsay-flood"]) STATE.billingTerms["lindsay-flood"] = { type:"hourly", hourlyRate:200, selfPay:true };
+    const ytdTarget = { "lisa-s":2000, "lisa-c":2200, "courtney":750, "clodagh":750, "regina":400, "elizabeth":250, "lindsay-flood":200 };
+    Object.keys(ytdTarget).forEach(cl => {
+      if(STATE.invoices.some(i => i.client===cl && (i.desc||"").startsWith("YTD per self-pay sheet"))) return;
+      const have = STATE.invoices.filter(i => i.client===cl && i.kind!=="reimbursement" && i.status==="paid" && (i.sentDate||"").startsWith("2026")).reduce((t,i)=>t+(Number(i.amount)||0),0);
+      const gap = ytdTarget[cl] - have;
+      if(gap > 0.004) STATE.invoices.push({ id:nid++, client:cl, desc:"YTD per self-pay sheet (Venmo)", amount:gap, status:"paid", sentDate:"2026-11-10", dueDate:"", kind:"fee" });
+    });
+    // Fiona / Carve AI: sheet total is $13,000 paid to personal account
+    const sk = STATE.invoices.find(i => i.id===52 && i.client==="sakata");
+    if(sk && sk.amount !== 6500){ sk.amount = 6500; sk.sentDate = sk.sentDate || "2026-09-08"; sk.desc = "Final balance. Carve paid $13,500 total: $13,000 fees plus $500 expenses (paid to personal account)"; }
+    if(sk && !STATE.invoices.some(i => i.client==="sakata" && i.kind==="reimbursement" && Number(i.amount)===500)){
+      STATE.invoices.push({ id:nid++, client:"sakata", desc:"Expenses reimbursed (part of Carve $13,500)", amount:500, status:"paid", sentDate:"2026-09-08", dueDate:"", kind:"reimbursement" });
+    }
+    if(sk && /expenses reimbursed separately|Project total \$13,000/.test(sk.desc||"")){ sk.desc = "Final balance. Carve paid $13,500 total: $13,000 fees plus $500 expenses (paid to personal account)"; }
 
     STATE.syncNov12Version = CURRENT_SYNC_NOV12_VERSION;
     migratedOct12 = true;
@@ -3166,8 +3205,9 @@ function renderSelfPayDashboard(){
       .reduce((s,i) => s + (Number(i.amount) || 0), 0);
     const ytdShown = ovVal("sp_"+c.id, ytd);
     grandTotal += ytdShown;
-    return `<div class="selfpay-tile">
-      <div class="lbl">${c.name} <span style="font-weight:400;">(${reason})</span></div>
+    const stc = c.status === "paused" ? "st-paused" : "st-active";
+    return `<div class="selfpay-tile ${stc}">
+      <div class="lbl">${c.name} <span style="font-weight:400;">(${reason})</span><span class="st-dot ${stc}">${c.status === "paused" ? "Paused" : "Active"}</span></div>
       <div class="val">${ovTile("sp_"+c.id, ytd)}</div>
     </div>`;
   }).join("");
@@ -3401,8 +3441,12 @@ function renderClientRoster(){
     const uhText = uh > 0 ? `<div class="bt-terms">${uh} hrs logged, not yet invoiced ≈ $${(uh * (bt.hourlyRate||0)).toLocaleString(undefined,{maximumFractionDigits:2})}</div>` : "";
     const renewBadge = (bt.type === "prepay" && terms.remaining !== undefined && terms.remaining <= 2) ? `<span class="renew-badge">⚑ Renew soon</span>` : "";
     return `
-    <div class="cr-row">
+    <div class="cr-row ${c.status==="paused" ? "st-paused" : "st-active"}">
       <div class="cr-fields">
+        <select class="st-select ${c.status==="paused" ? "st-paused" : "st-active"}" data-field="status" data-id="${c.id}">
+          <option value="active" ${c.status!=="paused"?"selected":""}>Active</option>
+          <option value="paused" ${c.status==="paused"?"selected":""}>Paused</option>
+        </select>
         <input type="text" class="cr-name" data-field="name" data-id="${c.id}" value="${escAttr(c.name)}" placeholder="Client / company name">
         <input type="text" class="cr-meta" data-field="meta" data-id="${c.id}" value="${escAttr(c.meta)}" placeholder="Notes (contacts, cadence, etc.)">
       </div>
@@ -4012,8 +4056,12 @@ document.getElementById("addClientBtn").addEventListener("click", ()=>{
   let id = slugify(name);
   let suffix = 2;
   while(clientById(id)){ id = slugify(name) + "-" + suffix; suffix++; }
-  STATE.clients.push({ id, name, meta: metaInput.value.trim(), engagements: [] });
+  STATE.clients.push({ id, name, meta: metaInput.value.trim(), engagements: [], status: document.getElementById("crStatusSelect").value });
+  if(document.getElementById("crSelfPay").checked){
+    STATE.billingTerms[id] = { type:"hourly", hourlyRate: Number(document.getElementById("crRateInput").value) || null, selfPay:true };
+  }
   nameInput.value = ""; metaInput.value = "";
+  document.getElementById("crSelfPay").checked = false; document.getElementById("crRateInput").value = ""; document.getElementById("crStatusSelect").value = "active";
   markDirty(); renderAll();
 });
 
