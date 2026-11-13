@@ -967,8 +967,6 @@
       <p class="panel-note" style="margin:-4px 0 10px;">Self-pay/Venmo clients (Lisa S, Lisa C, Regina, Courtney, Clodagh) plus anything tracked in a separate part of your sheet (Carve AI - Sakata) — none of this feeds the Pending/Outstanding/YTD Received tiles or the tax estimate above.</p>
       <div id="selfPayDashboard"></div>
 
-      <p class="inv-subhead">This Month's Invoicing Checklist</p>
-      <div id="invoiceChecklist" style="margin-bottom:22px;"></div>
 
       <p class="inv-subhead">Business Info &amp; Payment Details</p>
       <p class="panel-note" style="margin:-4px 0 10px;">Used to generate your invoice PDFs. This saves to your private database only — never hardcoded in the page's public source code, since your repo is public.</p>
@@ -2901,6 +2899,8 @@ function renderInvoiceEditForm(inv){
     <input type="date" class="inv-edit-sent" value="${inv.sentDate||""}">
     <span class="bt-field-label">Due</span>
     <input type="date" class="inv-edit-due" value="${inv.dueDate||""}">
+    <span class="bt-field-label">PDF description</span>
+    <input type="text" class="inv-edit-pdfdesc" value="${escAttr(inv.pdfDesc||"")}" placeholder="Shown on the PDF line item" style="min-width:220px;">
     <span class="bt-field-label">Invoice #</span>
     <input type="text" class="inv-edit-number" value="${escAttr(inv.invoiceNumber||"")}" style="width:90px;">
     <select class="inv-edit-kind">
@@ -3017,6 +3017,12 @@ function generateInvoicePDF(invoiceId){
     unitPrice = bt.hourlyRate;
     description = "Coaching";
   }
+  // Let the user set the line-item description before the PDF is generated
+  const entered = window.prompt("Description for the invoice PDF (this appears on the line item):", inv.pdfDesc || description || "Coaching");
+  if(entered === null) return; // cancelled: no PDF
+  description = entered.trim() || description || "Coaching";
+  inv.pdfDesc = description;
+  markDirty();
 
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit:"pt", format:"letter" });
@@ -3058,11 +3064,12 @@ function generateInvoicePDF(invoiceId){
   doc.line(40, y, pageW-40, y);
   y += 16;
   doc.setFont("helvetica","normal");
-  doc.text(description, 48, y);
+  const descLines = doc.splitTextToSize(description, pageW-340);
+  doc.text(descLines, 48, y);
   doc.text(String(qty), pageW-230, y);
   doc.text(unitPrice.toFixed(2), pageW-165, y);
   doc.text(Number(inv.amount).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}), pageW-60, y, { align:"right" });
-  y += 20;
+  y += 20 + Math.max(0, descLines.length-1) * 11;
   doc.line(40, y, pageW-40, y);
   y += 18;
 
@@ -3223,6 +3230,7 @@ function renderSelfPayDashboard(){
 /* ---------- Monthly Invoicing Checklist ---------- */
 function renderInvoiceChecklist(){
   const el = document.getElementById("invoiceChecklist");
+  if(!el) return; // section removed
   const now = new Date();
   const monthKey = now.toISOString().slice(0,7); // YYYY-MM
 
@@ -3828,6 +3836,8 @@ document.getElementById("invoiceBoard").addEventListener("click", (e)=>{
     if(inv.status !== "sent") inv.overdue = false;
     inv.sentDate = form.querySelector(".inv-edit-sent").value;
     inv.dueDate = form.querySelector(".inv-edit-due").value;
+    const pd = form.querySelector(".inv-edit-pdfdesc").value.trim();
+    if(pd) inv.pdfDesc = pd; else delete inv.pdfDesc;
     const num = form.querySelector(".inv-edit-number").value.trim();
     if(num) inv.invoiceNumber = num; else delete inv.invoiceNumber;
     inv.kind = form.querySelector(".inv-edit-kind").value;
@@ -3881,7 +3891,7 @@ document.getElementById("addInvoiceBtn").addEventListener("click", ()=>{
 });
 
 /* ---- Monthly Invoicing Checklist events ---- */
-document.getElementById("invoiceChecklist").addEventListener("click", (e)=>{
+(document.getElementById("invoiceChecklist") || document.createElement("div")).addEventListener("click", (e)=>{
   const btn = e.target.closest("[data-action='prefill-invoice']");
   if(!btn) return;
   document.getElementById("invClientSelect").value = btn.dataset.id;
